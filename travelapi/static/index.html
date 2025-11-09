@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>旅遊助手｜行程建立精靈</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /* ===== 亮色主題（整理後）===== */
+    :root{
+      --bg:#f5f7fb;      /* 網站背景（亮） */
+      --card:#ffffff;     /* 卡片背景（白） */
+      --muted:#6b7280;    /* 次要文字（灰） */
+      --border:#e5e7eb;   /* 邊框淺灰 */
+      --accent:#2563eb;   /* 主色（藍） */
+    }
+
+    /* 基本色與容器 */
+    body{background:var(--bg);color:#0f172a}
+    .card{background:var(--card);border:1px solid var(--border);box-shadow:0 8px 24px rgba(2,6,23,.06)}
+    .text-muted{color:var(--muted)!important}
+
+    /* 表單與按鈕 */
+    .form-control,.form-select{background:#ffffff;color:#111827;border-color:#d1d5db}
+    .form-control:focus,.form-select:focus{border-color:#93c5fd;box-shadow:0 0 0 .2rem rgba(147,197,253,.35)}
+    .btn-primary{background:var(--accent);border-color:var(--accent)}
+
+    /* 月曆 */
+    .calendar-wrap{ max-width: 520px; margin: 0 auto; position: relative; }
+    .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:.3rem}
+    .weekday{font-size:.85rem;color:var(--muted);text-align:center}
+    .day{
+      /* 讓上下更窄：固定高度 */
+      aspect-ratio:auto; height:40px;
+      border:1px solid var(--border);border-radius:.4rem;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#ffffff;color:#0f172a
+    }
+    .day.disabled{opacity:.35;cursor:not-allowed}
+    .day.selected{outline:2px solid #93c5fd;background:#eff6ff}
+
+    /* 偏好選項（chip） */
+    .pref-chip{background:#f3f4f6;color:#111827;border:1px solid #d1d5db;border-radius:999px;padding:.35rem .8rem;cursor:pointer;transition:all .15s}
+    .pref-chip:hover{background:#e5e7eb}
+    .pref-chip.active{background:#d1d5db;border-color:#9ca3af;color:#111}
+
+    /* 其他輔助 */
+    .sticky-footer{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(245,247,251,0),var(--bg) 30%);padding-top:1rem}
+    .badge-soft{background:#eef2ff;color:#1e3a8a;border:1px solid #dbeafe}
+    code.inline{background:#f8fafc;border:1px solid var(--border);padding:.1rem .35rem;border-radius:.3rem}
+    .pointer{cursor:pointer}
+
+    /* Reset 按鈕吸附在月曆右下 */
+    #btnResetDates{ position:absolute; right:0; bottom:-6px; }
+
+    /* navbar 右側不折行、select 寬度自動 */
+    .navbar .flex-nowrap { flex-wrap: nowrap; }
+    .navbar .form-select.w-auto { width: auto; }
+
+    /* 刪除鈕停用樣式 */
+    #btnDelete:disabled { opacity:.5; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg mb-4" style="background:linear-gradient(90deg,#ffffff,#f5f7fb);border-bottom:1px solid var(--border)">
+    <div class="container">
+      <span class="navbar-brand text-truncate" style="max-width:40vw">旅遊助手｜行程建立精靈</span>
+      <div class="ms-auto d-flex align-items-center gap-2 flex-nowrap">
+        <span class="text-muted small text-nowrap flex-shrink-0">行程：</span>
+        <select id="tripSel" class="form-select form-select-sm w-auto flex-shrink-0" style="min-width:200px">
+          <option value="new" selected>（新建）</option>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container pb-5">
+    <!-- Step 1: 基本資訊 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="mb-3">Step 1｜行程基本資訊</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">行程名稱</label>
+            <input id="tripName" class="form-control" placeholder="例如：東京 5 日輕旅行">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">地區 / 城市</label>
+            <input id="region" class="form-control" placeholder="例如：東京、關西、沖繩、首爾、台北">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">預算（TWD）</label>
+            <div class="input-group">
+              <input id="budget" type="number" min="0" step="1000" class="form-control" placeholder="例如：30000">
+            </div>
+            <div class="form-text text-muted">以千元為單位調整。</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">人數</label>
+            <input id="people" type="number" min="1" class="form-control" value="1">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">單日遊玩時長（小時）</label>
+            <input id="dailyHours" type="number" min="1" max="24" class="form-control" value="8">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">基準月份</label>
+            <div class="d-flex gap-2">
+              <select id="yearSel" class="form-select"></select>
+              <select id="monthSel" class="form-select"></select>
+            </div>
+            <div class="form-text text-muted">用下方月曆選擇出發與結束日期（最多 30 天）。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: 月曆選日 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="mb-3">Step 2｜選擇日期區間（同一個月，最多 30 天）</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <div class="calendar-wrap">
+              <div class="d-grid" style="grid-template-columns:repeat(7,1fr);gap:.3rem">
+                <div class="weekday">日</div>
+                <div class="weekday">一</div>
+                <div class="weekday">二</div>
+                <div class="weekday">三</div>
+                <div class="weekday">四</div>
+                <div class="weekday">五</div>
+                <div class="weekday">六</div>
+              </div>
+              <div id="calendar" class="calendar mt-2"></div>
+              <button id="btnResetDates" class="btn btn-sm btn-outline-secondary">Reset</button>
+            </div>
+          </div>
+          <div class="col-12 d-flex flex-wrap gap-3 align-items-center">
+            <span class="badge badge-soft">出發：<span id="startText">—</span></span>
+            <span class="badge badge-soft">結束：<span id="endText">—</span></span>
+            <span class="badge badge-soft">天數：<span id="daysText">0</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: 旅遊習慣偏好 -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="mb-3">Step 3｜有偏好的旅遊習慣嗎？</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">行程節奏</label>
+            <div id="pace" class="d-flex flex-wrap gap-2"></div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">偏好類型（可複選）</label>
+            <div id="types" class="d-flex flex-wrap gap-2"></div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">交通偏好（可複選）</label>
+            <div id="transport" class="d-flex flex-wrap gap-2"></div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">用餐取向（可複選）</label>
+            <div id="dining" class="d-flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 預覽/提交 -->
+    <div class="sticky-footer">
+      <div class="card shadow-sm">
+        <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+          <div class="me-auto">
+            <div class="small text-muted">提交前預覽（會存到 LocalStorage，也會送到後端）</div>
+            <div class="small"><span class="text-muted">關鍵：</span>名稱=<code class="inline" id="pName">—</code>，地區=<code class="inline" id="pRegion">—</code>，日期=<code class="inline" id="pDate">—</code>，天數=<code class="inline" id="pDays">0</code>，人數=<code class="inline" id="pPeople">1</code>，單日小時=<code class="inline" id="pHours">8</code></div>
+          </div>
+          <button id="btnSubmit" class="btn btn-primary">建立行程</button>
+          <button id="btnDelete" class="btn btn-outline-danger">刪除行程</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Debug 預覽區（可收合） -->
+    <div class="card mt-3">
+      <div class="card-body">
+        <details>
+          <summary class="pointer">JSON 預覽</summary>
+          <pre id="jsonPreview" class="mt-3" style="white-space:pre-wrap"></pre>
+        </details>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // ====== 狀態（LocalStorage） ======
+    const storeKey = 'travel_assistant_trip_setup_v1';
+    let state = loadState() || {
+      name: '', region: '', budget: 0, people: 1, dailyHours: 8,
+      year: new Date().getFullYear(), month: new Date().getMonth()+1,
+      startDay: null, endDay: null,
+      prefs: { pace: '適中', types: [], transport: [], dining: [] }
+    };
+
+    function saveState(){ localStorage.setItem(storeKey, JSON.stringify(state)); renderPreview(); }
+    function loadState(){ try{ return JSON.parse(localStorage.getItem(storeKey)||''); }catch{ return null; } }
+
+    // 後端 API base
+    const API = "http://localhost:8080/api";
+
+    // ====== 元件 ======
+    const els = {
+      tripName: document.getElementById('tripName'),
+      region: document.getElementById('region'),
+      budget: document.getElementById('budget'),
+      budgetInc: document.getElementById('budgetInc'), // 可不存在，程式有保護
+      budgetDec: document.getElementById('budgetDec'),
+      people: document.getElementById('people'),
+      dailyHours: document.getElementById('dailyHours'),
+      yearSel: document.getElementById('yearSel'),
+      monthSel: document.getElementById('monthSel'),
+      calendar: document.getElementById('calendar'),
+      startText: document.getElementById('startText'),
+      endText: document.getElementById('endText'),
+      daysText: document.getElementById('daysText'),
+      btnSubmit: document.getElementById('btnSubmit'),
+      btnDelete: document.getElementById('btnDelete'),
+      pName: document.getElementById('pName'),
+      pRegion: document.getElementById('pRegion'),
+      pDate: document.getElementById('pDate'),
+      pDays: document.getElementById('pDays'),
+      pPeople: document.getElementById('pPeople'),
+      pHours: document.getElementById('pHours'),
+      jsonPreview: document.getElementById('jsonPreview'),
+      pace: document.getElementById('pace'),
+      types: document.getElementById('types'),
+      transport: document.getElementById('transport'),
+      dining: document.getElementById('dining'),
+      resetDates: document.getElementById('btnResetDates'),
+      tripSel: document.getElementById('tripSel'),
+    };
+
+    // ====== 初始化下拉（年/月） ======
+    (function initYearMonth(){
+      const y = state.year; const m = state.month;
+      const nowY = new Date().getFullYear();
+      const years = [];
+      for(let i=-1;i<=3;i++) years.push(nowY+i);
+      els.yearSel.innerHTML = years.map(v=>`<option ${v===y?'selected':''}>${v}</option>`).join('');
+      els.monthSel.innerHTML = Array.from({length:12},(_,i)=>i+1).map(v=>`<option ${v===m?'selected':''}>${v}</option>`).join('');
+    })();
+
+    // ====== 偏好選項 ======
+    const paceOpts = ['悠閒','適中','緊湊'];
+    const typeOpts = ['景點','美食','購物','自然','博物館','夜生活','親子','展演'];
+    const transportOpts = ['步行','大眾運輸','計程車','自駕'];
+    const diningOpts = ['在地小吃','米其林/評鑑','平價優先','素食友善'];
+
+    function renderChips(container, options, single=false, key){
+      container.innerHTML='';
+      options.forEach(opt=>{
+        const active = single ? (state.prefs[key]===opt) : (state.prefs[key]?.includes(opt));
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'pref-chip'+(active?' active':''); btn.textContent = opt;
+        btn.addEventListener('click', ()=>{
+          if(single){ state.prefs[key] = opt; }
+          else{ const arr = new Set(state.prefs[key]||[]); if(arr.has(opt)) arr.delete(opt); else arr.add(opt); state.prefs[key] = Array.from(arr); }
+          saveState(); renderChips(container, options, single, key);
+        });
+        container.appendChild(btn);
+      });
+    }
+    renderChips(els.pace, paceOpts, true, 'pace');
+    renderChips(els.types, typeOpts, false, 'types');
+    renderChips(els.transport, transportOpts, false, 'transport');
+    renderChips(els.dining, diningOpts, false, 'dining');
+
+    // ====== 月曆 ======
+    function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
+    function firstDayOffset(y,m){ return new Date(y, m-1, 1).getDay(); }
+
+    function buildCalendar(){
+      const y = parseInt(els.yearSel.value,10); const m = parseInt(els.monthSel.value,10);
+      state.year=y; state.month=m; saveState();
+      const dim = daysInMonth(y,m); const off = firstDayOffset(y,m);
+      const cells = [];
+      for(let i=0;i<off;i++) cells.push(`<div></div>`);
+      for(let d=1; d<=dim; d++){
+        const sel = (state.startDay && state.endDay && d>=state.startDay && d<=state.endDay);
+        cells.push(`<div class="day ${sel?'selected':''}" data-day="${d}">${d}</div>`);
+      }
+      els.calendar.innerHTML = cells.join('');
+      els.calendar.querySelectorAll('.day').forEach(el=>{ el.addEventListener('click', ()=>selectDay(parseInt(el.dataset.day,10))); });
+      updateRangeText();
+    }
+
+    function selectDay(d){
+      if(!state.startDay || (state.startDay && state.endDay)){
+        state.startDay = d; state.endDay = null;
+      }else{
+        if(d < state.startDay){ state.endDay = state.startDay; state.startDay = d; }
+        else { state.endDay = d; }
+        const len = state.endDay - state.startDay + 1;
+        if(len > 30){ state.endDay = state.startDay + 29; alert('一次最多選 30 天，已自動截斷'); }
+      }
+      saveState(); buildCalendar();
+    }
+
+    function updateRangeText(){
+      const y = state.year, m = state.month; const s = state.startDay, e = state.endDay; const pad=n=>String(n).padStart(2,'0');
+      els.startText.textContent = s? `${y}-${pad(m)}-${pad(s)}` : '—';
+      els.endText.textContent   = e? `${y}-${pad(m)}-${pad(e)}` : '—';
+      els.daysText.textContent  = (s&&e)? (e - s + 1) : 0;
+    }
+
+    // Reset 日期
+    if (els.resetDates) els.resetDates.addEventListener('click', ()=>{
+      state.startDay = null; state.endDay = null; saveState(); buildCalendar();
+    });
+
+    // ====== 預覽與提交 ======
+    function currentPayload(){
+      const y = state.year, m = state.month, s = state.startDay, e = state.endDay; const pad=n=>String(n).padStart(2,'0');
+      const start_date = (s? `${y}-${pad(m)}-${pad(s)}` : '');
+      const days = (s&&e)? (e - s + 1) : 0;
+      return {
+        name: state.name?.trim()||'',
+        region: state.region?.trim()||'',
+        budget_twd: Number(state.budget)||0,
+        people: Math.max(1, Number(state.people)||1),
+        daily_hours: Math.min(24, Math.max(1, Number(state.dailyHours)||8)),
+        start_date, days,
+        month_span: { year: state.year, month: state.month },
+        preferences: state.prefs
+      }
+    }
+
+    function renderPreview(){
+      els.pName.textContent = state.name||'—';
+      els.pRegion.textContent = state.region||'—';
+      const y = state.year, m = state.month, s = state.startDay, e = state.endDay; const pad=n=>String(n).padStart(2,'0');
+      els.pDate.textContent = (s&&e)? `${y}-${pad(m)}-${pad(s)} → ${y}-${pad(m)}-${pad(e)}` : '—';
+      els.pDays.textContent = (s&&e)? (e - s + 1) : 0;
+      els.pPeople.textContent = state.people||1;
+      els.pHours.textContent = state.dailyHours||8;
+      els.jsonPreview.textContent = JSON.stringify(currentPayload(), null, 2);
+    }
+
+    function syncInputs(){
+      els.tripName.value = state.name||''; els.region.value = state.region||'';
+      els.budget.value = state.budget||0; els.people.value = state.people||1; els.dailyHours.value = state.dailyHours||8;
+      els.yearSel.value = state.year; els.monthSel.value = state.month; renderPreview();
+    }
+
+    // 金額調整（支援按鈕不存在時忽略）
+    els.budget.addEventListener('input',   ()=>{ state.budget=els.budget.value; saveState(); });
+    els.budget.addEventListener('change',  normalizeBudget);
+    if (els.budgetInc) els.budgetInc.addEventListener('click', ()=>adjustBudget(1000));
+    if (els.budgetDec) els.budgetDec.addEventListener('click', ()=>adjustBudget(-1000));
+    function normalizeBudget(){
+      let v = parseInt(els.budget.value||0,10); if (isNaN(v)) v = 0; v = Math.round(v/1000)*1000; v = Math.max(0, v);
+      els.budget.value = v; state.budget = v; saveState();
+    }
+    function adjustBudget(delta){
+      let v = parseInt(els.budget.value || state.budget || 0, 10); if (isNaN(v)) v = 0; v = Math.max(0, v + delta); v = Math.round(v/1000)*1000;
+      els.budget.value = v; state.budget = v; saveState();
+    }
+
+    els.tripName.addEventListener('input', ()=>{ state.name=els.tripName.value; saveState(); });
+    els.region.addEventListener('input',   ()=>{ state.region=els.region.value; saveState(); });
+    els.people.addEventListener('input',   ()=>{ state.people=els.people.value; saveState(); });
+    els.dailyHours.addEventListener('input',()=>{ state.dailyHours=els.dailyHours.value; saveState(); });
+    els.yearSel.addEventListener('change', buildCalendar);
+    els.monthSel.addEventListener('change', buildCalendar);
+
+    // ====== 後端：載入 Trip 列表與切換 ======
+    let currentTripId = null; // 目前選取中的 Trip（null=新建）
+
+    async function fetchJSON(url){ const r = await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+
+    async function loadTripList(){
+      try{
+        const list = await fetchJSON(`${API}/trips`);
+        const cur = els.tripSel.value;
+        els.tripSel.innerHTML = `<option value="new">（新建）</option>` +
+          list.map(t=>`<option value="${t.id}">${t.name || '(未命名)'}</option>`).join('');
+        if(cur!=="new" && list.some(t=>String(t.id)===cur)) els.tripSel.value = cur; else els.tripSel.value = 'new';
+      }catch(e){ console.warn('載入旅行清單失敗：', e.message); }
+      setDeleteEnabled();
+    }
+
+    async function loadTripById(id){
+      try{
+        const t = await fetchJSON(`${API}/trips/${id}`);
+        state.name = t.name||''; state.region=t.region||''; state.budget=t.budget_twd||0;
+        state.people=t.people||1; state.dailyHours=t.daily_hours||8;
+        if(t.start_date){ const [yy,mm,dd] = t.start_date.split('-').map(n=>parseInt(n,10)); state.year=yy; state.month=mm; state.startDay=dd; state.endDay=dd+(t.days|0)-1; }
+        saveState(); syncInputs(); buildCalendar();
+        currentTripId = Number(id);
+      }catch(e){ alert('讀取行程失敗：'+e.message); }
+      setDeleteEnabled();
+    }
+
+    function resetToDefaults() {
+      state = {
+        name: '', region: '', budget: 0, people: 1, dailyHours: 8,
+        year: new Date().getFullYear(), month: new Date().getMonth() + 1,
+        startDay: null, endDay: null,
+        prefs: { pace: '適中', types: [], transport: [], dining: [] }
+      };
+      localStorage.removeItem('travel_assistant_trip_v1');
+      saveState();
+      syncInputs();
+      buildCalendar();
+      currentTripId = null;
+      setDeleteEnabled();
+    }
+
+    function setDeleteEnabled() {
+      if (!els.btnDelete) return;
+      const isNew = !els.tripSel || els.tripSel.value === 'new';
+      els.btnDelete.disabled = isNew;
+      els.btnDelete.title = isNew ? '請先選擇一個已存在的行程' : '';
+    }
+
+    // 切換現有旅行 / 新建
+    els.tripSel.addEventListener('change', ()=>{
+      if(els.tripSel.value==='new'){ resetToDefaults(); }
+      else { loadTripById(els.tripSel.value); }
+    });
+
+    // ====== 建立/更新 ======
+    els.btnSubmit.addEventListener('click', async ()=>{
+      const p = currentPayload();
+      if(!p.name){ alert('請輸入行程名稱'); return; }
+      if(!p.region){ alert('請輸入地區/城市'); return; }
+      if(!p.start_date || p.days<=0){ alert('請在月曆選擇有效的日期區間'); return; }
+
+      // 保留一份本機草稿
+      localStorage.setItem('travel_assistant_trip_v1', JSON.stringify({
+        name:p.name, startDate:p.start_date, days:p.days, region:p.region, budget_twd:p.budget_twd,
+        people:p.people, daily_hours:p.daily_hours, plan:{}
+      }));
+
+      const isUpdate = (els.tripSel.value !== 'new');
+      try{
+        els.btnSubmit.disabled = true;
+        const old = els.btnSubmit.textContent;
+        els.btnSubmit.textContent = isUpdate ? '更新中…' : '建立中…';
+
+        let resp;
+        if(isUpdate){
+          const id = els.tripSel.value;
+          resp = await fetch(`${API}/trips/${id}`, {
+            method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              id:Number(id), name:p.name, region:p.region, start_date:p.start_date, days:p.days,
+              budget_twd:p.budget_twd, people:p.people, daily_hours:p.daily_hours, plan:[]
+            })
+          });
+        }else{
+          resp = await fetch(`${API}/trips`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              name:p.name, region:p.region, start_date:p.start_date, days:p.days,
+              budget_twd:p.budget_twd, people:p.people, daily_hours:p.daily_hours
+            })
+          });
+        }
+        if(!resp.ok){ throw new Error(await resp.text() || ('HTTP '+resp.status)); }
+        const trip = await resp.json();
+        localStorage.setItem('travel_assistant_trip_v1', JSON.stringify(trip));
+        await loadTripList();
+        els.tripSel.value = String(trip.id); currentTripId = trip.id; setDeleteEnabled();
+        alert(isUpdate ? `已更新（ID: ${trip.id}）` : `已建立（ID: ${trip.id}）`);
+        els.btnSubmit.textContent = '同步完成 ✓'; setTimeout(()=>{ els.btnSubmit.disabled=false; els.btnSubmit.textContent = old; }, 900);
+      }catch(err){
+        console.error(err);
+        alert('同步失敗：'+err.message);
+        els.btnSubmit.disabled=false; els.btnSubmit.textContent='建立行程';
+      }
+    });
+
+    // ====== 刪除 ======
+    if (els.btnDelete) {
+      els.btnDelete.addEventListener('click', async () => {
+        const id = els.tripSel?.value;
+        if (!id || id === 'new') return;
+        if (!confirm('確定要刪除這個行程嗎？此動作無法復原。')) return;
+        try {
+          els.btnDelete.disabled = true;
+          const resp = await fetch(`${API}/trips/${id}`, { method: 'DELETE' });
+          if (!resp.ok && resp.status !== 204) { throw new Error(await resp.text() || ('HTTP ' + resp.status)); }
+          await loadTripList();
+          els.tripSel.value = 'new';
+          resetToDefaults();
+          alert('已刪除');
+        } catch (err) {
+          console.error(err);
+          alert('刪除失敗：' + err.message);
+          setDeleteEnabled();
+        }
+      });
+    }
+
+    // ====== 啟動 ======
+    function renderPreviewOnLoad(){ syncInputs(); buildCalendar(); }
+    renderPreviewOnLoad();
+    loadTripList();
+    setDeleteEnabled();
+  </script>
+</body>
+</html>
