@@ -20,6 +20,8 @@ Go-Travel-Planner/
 
 ```bash
 ./status.sh
+
+bash status.sh
 ```
 
 ## 快速開始
@@ -27,7 +29,7 @@ Go-Travel-Planner/
 ### 方法一：使用啟動腳本（推薦）
 
 ```bash
-./start.sh
+go run main.go
 ```
 
 ### 方法二：直接執行
