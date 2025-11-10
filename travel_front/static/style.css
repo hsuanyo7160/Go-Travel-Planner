@@ -1,0 +1,112 @@
+/* Global smooth scroll */
+html { scroll-behavior: smooth; }
+
+/* Page background: warm gradient + faint textured overlay so outer frame isn't plain white */
+body{
+  background: linear-gradient(180deg, #fff7f0 0%, #fff3e8 100%);
+  color:#0f172a;
+  position: relative;
+  overflow-x: hidden;
+}
+body::before{
+  content: '';
+  position: fixed; inset: 0; z-index: -1;
+  background-image: url('Source_img/image2.jpg');
+  background-size: cover; background-position: center center;
+  opacity: 0.04; filter: blur(1px) saturate(0.85);
+  pointer-events: none;
+}
+
+/* Navbar: use translucent warm tint instead of stark white */
+.navbar{
+  background: linear-gradient(90deg, rgba(255, 192, 129, 0.9), rgba(255,247,238,0.85)) !important;
+  border-bottom: 1px solid rgba(194,120,34,0.06) !important;
+}
+
+/* Hero cover */
+.hero {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+/* Slides container: each slide is absolutely positioned and fades in/out */
+.hero-slides { position: absolute; inset: 0; z-index: 1; }
+.hero-slide {
+  position: absolute; inset: 0; background-size: cover; background-position: center center;
+  opacity: 0; transition: opacity 1s ease; will-change: opacity;
+}
+.hero-slide.active { opacity: 1; }
+
+/* A subtle dark gradient overlay for text readability */
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.45));
+  z-index: 2;
+}
+
+.hero-content { position: relative; z-index: 3; padding: 2rem 1rem; }
+.hero-title { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 700; margin-bottom: .5rem; }
+.hero-sub { font-size: 1.125rem; margin-bottom: 1rem; opacity: .95; }
+
+/* Slightly larger CTA */
+.hero .btn { padding: .75rem 1.25rem; font-size: 1.05rem; }
+
+/* Make main stand out from hero */
+main.container { margin-top: 3rem; }
+
+/* On smaller screens reduce spacing */
+@media (max-width: 576px){
+  .hero-title{ font-size: 1.75rem }
+  .hero-sub{ font-size: 1rem }
+}
+
+/* ========== 秋天主題樣式（表單區） ========== */
+.autumn-section{
+  position: relative;
+  overflow: hidden;
+  /* 溫暖漸層 + 背景圖（採用 Source_img/image2.jpg） */
+  background-image: linear-gradient(180deg, rgba(255,243,231,0.85), rgba(255,239,230,0.9)), url('Source_img/image2.jpg');
+  background-size: cover;
+  background-position: center center;
+  padding: 2rem;
+}
+
+/* 褪色遮罩讓卡片更易閱讀 */
+.autumn-section::before{
+  content: '';
+  position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.25), rgba(255,250,240,0.6));
+  pointer-events: none;
+}
+
+.autumn-section .card{ position: relative; z-index: 2; background: rgba(255,255,255,0.92); border: 1px solid rgba(194,120,34,0.12); box-shadow: 0 10px 30px rgba(95,50,15,0.06); }
+
+.autumn-section .card .card-body h5, .autumn-section h5{
+  color: #8b3e00; /* 深暖棕 */
+  font-weight:700;
+}
+
+/* 小標題裝飾：左側暖色條 */
+.autumn-section h5{ position: relative; padding-left: 1rem; }
+.autumn-section h5::before{ content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width:6px; height:28px; border-radius:3px; background: linear-gradient(180deg,#f97316,#fb923c); }
+
+/* 節點間距與按鈕色調 */
+.autumn-section .btn-primary{ background: linear-gradient(90deg,#d97706,#f97316); border-color: #d97706; }
+.autumn-section .form-text{ color: #6b4a2e }
+
+/* 偏好 chip 在秋色上更明顯 */
+.autumn-section .pref-chip{ background: rgba(255,250,240,0.9); border-color: rgba(194,120,34,0.12); }
+.autumn-section .pref-chip.active{ background: #ffd8a8; border-color: #fb923c; }
+
+/* 調整預覽區字色 */
+.autumn-section .text-muted{ color: #5a3b1a !important }
+
+/* JSON preview 背景更柔和 */
+.autumn-section pre{ background: rgba(18,12,8,0.03); border: 1px solid rgba(18,12,8,0.04); padding: .75rem; }

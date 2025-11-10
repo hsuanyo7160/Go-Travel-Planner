@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>旅遊助手｜行程建立精靈</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts: Noto Sans TC (UI) + Noto Serif TC (headings) -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
   <style>
     /* ===== 亮色主題（整理後）===== */
     :root{
@@ -60,6 +63,16 @@
   </style>
 </head>
 <body>
+  <!-- Hero 封面 -->
+  <header class="hero">
+    <div class="hero-slides"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content container text-center">
+      <h1 class="hero-title">旅遊助手</h1>
+      <p class="hero-sub">快速擬定一趟適合你的行程</p>
+      <button id="heroBtn" class="btn btn-primary btn-lg">開始建立行程</button>
+    </div>
+  </header>
   <nav class="navbar navbar-expand-lg mb-4" style="background:linear-gradient(90deg,#ffffff,#f5f7fb);border-bottom:1px solid var(--border)">
     <div class="container">
       <span class="navbar-brand text-truncate" style="max-width:40vw">旅遊助手｜行程建立精靈</span>
@@ -73,6 +86,8 @@
   </nav>
 
   <main class="container pb-5">
+    <!-- 秋天主題包裹：會在背景顯示溫暖的色調與圖片 -->
+    <div class="autumn-section rounded-4 p-4 mb-4">
     <!-- Step 1: 基本資訊 -->
     <div class="card mb-3">
       <div class="card-body">
@@ -101,14 +116,7 @@
             <label class="form-label">單日遊玩時長（小時）</label>
             <input id="dailyHours" type="number" min="1" max="24" class="form-control" value="8">
           </div>
-          <div class="col-md-3">
-            <label class="form-label">基準月份</label>
-            <div class="d-flex gap-2">
-              <select id="yearSel" class="form-select"></select>
-              <select id="monthSel" class="form-select"></select>
-            </div>
-            <div class="form-text text-muted">用下方月曆選擇出發與結束日期（最多 30 天）。</div>
-          </div>
+          
         </div>
       </div>
     </div>
@@ -116,27 +124,41 @@
     <!-- Step 2: 月曆選日 -->
     <div class="card mb-3">
       <div class="card-body">
-        <h5 class="mb-3">Step 2｜選擇日期區間（同一個月，最多 30 天）</h5>
+        <h5 class="mb-3">Step 2｜選擇日期區間</h5>
         <div class="row g-3">
           <div class="col-12">
             <div class="calendar-wrap">
-              <div class="d-grid" style="grid-template-columns:repeat(7,1fr);gap:.3rem">
-                <div class="weekday">日</div>
-                <div class="weekday">一</div>
-                <div class="weekday">二</div>
-                <div class="weekday">三</div>
-                <div class="weekday">四</div>
-                <div class="weekday">五</div>
-                <div class="weekday">六</div>
+              <div class="row g-3 align-items-start">
+                <div class="col-md-4">
+                  <div class="mb-2">
+                    <label class="form-label mb-0">基準月份：</label>
+                    <div class="d-flex gap-2 mt-1">
+                      <select id="yearSel" class="form-select w-auto"></select>
+                      <select id="monthSel" class="form-select w-auto"></select>
+                    </div>
+                  </div>
+                  <div class="mb-3"><small class="text-muted">用下方月曆選擇出發與結束日期</small></div>
+                  <div class="d-flex flex-column gap-2">
+                    <div><span class="badge badge-soft">出發：<span id="startText">—</span></span></div>
+                    <div><span class="badge badge-soft">結束：<span id="endText">—</span></span></div>
+                    <div><span class="badge badge-soft">天數：<span id="daysText">0</span></span></div>
+                  </div>
+                </div>
+                <div class="col-md-8">
+                  <div class="d-grid" style="grid-template-columns:repeat(7,1fr);gap:.3rem">
+                    <div class="weekday">日</div>
+                    <div class="weekday">一</div>
+                    <div class="weekday">二</div>
+                    <div class="weekday">三</div>
+                    <div class="weekday">四</div>
+                    <div class="weekday">五</div>
+                    <div class="weekday">六</div>
+                  </div>
+                  <div id="calendar" class="calendar mt-2"></div>
+                  <div class="mt-2"><button id="btnResetDates" class="btn btn-sm btn-outline-secondary">Reset</button></div>
+                </div>
               </div>
-              <div id="calendar" class="calendar mt-2"></div>
-              <button id="btnResetDates" class="btn btn-sm btn-outline-secondary">Reset</button>
             </div>
-          </div>
-          <div class="col-12 d-flex flex-wrap gap-3 align-items-center">
-            <span class="badge badge-soft">出發：<span id="startText">—</span></span>
-            <span class="badge badge-soft">結束：<span id="endText">—</span></span>
-            <span class="badge badge-soft">天數：<span id="daysText">0</span></span>
           </div>
         </div>
       </div>
@@ -152,31 +174,21 @@
             <div id="pace" class="d-flex flex-wrap gap-2"></div>
           </div>
           <div class="col-12">
-            <label class="form-label">偏好類型（可複選）</label>
+            <label class="form-label">偏好類型</label>
             <div id="types" class="d-flex flex-wrap gap-2"></div>
           </div>
           <div class="col-12">
-            <label class="form-label">交通偏好（可複選）</label>
+            <label class="form-label">交通偏好</label>
             <div id="transport" class="d-flex flex-wrap gap-2"></div>
           </div>
           <div class="col-12">
-            <label class="form-label">用餐取向（可複選）</label>
+            <label class="form-label">用餐取向</label>
             <div id="dining" class="d-flex flex-wrap gap-2"></div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 預覽/提交 -->
-    <div class="sticky-footer">
-      <div class="card shadow-sm">
-        <div class="card-body d-flex flex-wrap gap-2 align-items-center">
-          <div class="me-auto">
-            <div class="small text-muted">提交前預覽（會存到 LocalStorage，也會送到後端）</div>
-            <div class="small"><span class="text-muted">關鍵：</span>名稱=<code class="inline" id="pName">—</code>，地區=<code class="inline" id="pRegion">—</code>，日期=<code class="inline" id="pDate">—</code>，天數=<code class="inline" id="pDays">0</code>，人數=<code class="inline" id="pPeople">1</code>，單日小時=<code class="inline" id="pHours">8</code></div>
+          <div class="card-body d-flex justify-content-center gap-2 align-items-center">
+            <button id="btnSubmit" class="btn btn-primary">建立行程</button>
+            <button id="btnDelete" class="btn btn-outline-danger">刪除行程</button>
           </div>
-          <button id="btnSubmit" class="btn btn-primary">建立行程</button>
-          <button id="btnDelete" class="btn btn-outline-danger">刪除行程</button>
         </div>
       </div>
     </div>
@@ -191,7 +203,48 @@
       </div>
     </div>
 
+    </div> <!-- /.autumn-section -->
   </main>
+
+  <script>
+    // Hero CTA -> 滾動到表單區塊
+    document.addEventListener('DOMContentLoaded', function(){
+      const btn = document.getElementById('heroBtn');
+      if(btn){
+        btn.addEventListener('click', function(){
+          const main = document.querySelector('main.container');
+          if(main) main.scrollIntoView({behavior:'smooth'});
+        });
+      }
+      // ====== Hero slideshow ======
+      (function heroSlideshow(){
+        const images = [
+          'Source_img/image1.jpg',
+          'Source_img/image2.jpg'
+        ];
+        const intervalMs = 10000; // 10 seconds
+        const container = document.querySelector('.hero-slides');
+        if(!container || !images || images.length===0) return;
+
+        // Create slide elements
+        const slides = images.map((src,i)=>{
+          const d = document.createElement('div');
+          d.className = 'hero-slide'+(i===0? ' active':'');
+          d.style.backgroundImage = `url(${src})`;
+          container.appendChild(d);
+          return d;
+        });
+
+        let idx = 0;
+        setInterval(()=>{
+          const next = (idx+1) % slides.length;
+          slides[idx].classList.remove('active');
+          slides[next].classList.add('active');
+          idx = next;
+        }, intervalMs);
+      })();
+    });
+  </script>
 
   <script>
     // ====== 狀態（LocalStorage） ======
@@ -337,14 +390,14 @@
     }
 
     function renderPreview(){
-      els.pName.textContent = state.name||'—';
-      els.pRegion.textContent = state.region||'—';
       const y = state.year, m = state.month, s = state.startDay, e = state.endDay; const pad=n=>String(n).padStart(2,'0');
-      els.pDate.textContent = (s&&e)? `${y}-${pad(m)}-${pad(s)} → ${y}-${pad(m)}-${pad(e)}` : '—';
-      els.pDays.textContent = (s&&e)? (e - s + 1) : 0;
-      els.pPeople.textContent = state.people||1;
-      els.pHours.textContent = state.dailyHours||8;
-      els.jsonPreview.textContent = JSON.stringify(currentPayload(), null, 2);
+      if (els.pName) els.pName.textContent = state.name||'—';
+      if (els.pRegion) els.pRegion.textContent = state.region||'—';
+      if (els.pDate) els.pDate.textContent = (s&&e)? `${y}-${pad(m)}-${pad(s)} → ${y}-${pad(m)}-${pad(e)}` : '—';
+      if (els.pDays) els.pDays.textContent = (s&&e)? (e - s + 1) : 0;
+      if (els.pPeople) els.pPeople.textContent = state.people||1;
+      if (els.pHours) els.pHours.textContent = state.dailyHours||8;
+      if (els.jsonPreview) els.jsonPreview.textContent = JSON.stringify(currentPayload(), null, 2);
     }
 
     function syncInputs(){
@@ -470,11 +523,11 @@
         }
         if(!resp.ok){ throw new Error(await resp.text() || ('HTTP '+resp.status)); }
         const trip = await resp.json();
-        localStorage.setItem('travel_assistant_trip_v1', JSON.stringify(trip));
-        await loadTripList();
-        els.tripSel.value = String(trip.id); currentTripId = trip.id; setDeleteEnabled();
-        alert(isUpdate ? `已更新（ID: ${trip.id}）` : `已建立（ID: ${trip.id}）`);
-        els.btnSubmit.textContent = '同步完成 ✓'; setTimeout(()=>{ els.btnSubmit.disabled=false; els.btnSubmit.textContent = old; }, 900);
+  localStorage.setItem('travel_assistant_trip_v1', JSON.stringify(trip));
+  await loadTripList();
+  els.tripSel.value = String(trip.id); currentTripId = trip.id; setDeleteEnabled();
+  // Redirect to interactive chat/planning page for this trip
+  window.location.href = `/web/chat.html?trip=${trip.id}`;
       }catch(err){
         console.error(err);
         alert('同步失敗：'+err.message);
