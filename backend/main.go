@@ -329,11 +329,11 @@ func saveGeminiToFile(c *gin.Context) {
 		if b, err := os.ReadFile(dest); err == nil {
 			if err := json.Unmarshal(b, &out); err != nil {
 				// 若既有檔案不是期望格式，覆寫為新格式
-				out = OutFile{ Name: req.Name, Response: []string{} }
+				out = OutFile{Name: req.Name, Response: []string{}}
 			}
 		} else {
 			// 檔案不存在，建立新結構
-			out = OutFile{ Name: req.Name, Response: []string{} }
+			out = OutFile{Name: req.Name, Response: []string{}}
 		}
 
 		// 若 out.Name 為空，填入 req.Name
