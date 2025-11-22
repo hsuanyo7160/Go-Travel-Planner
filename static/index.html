@@ -499,7 +499,7 @@
       // 嘗試先呼叫後端的 Gemini API（非同步），若成功會顯示回應文字
       try{
         // 將目前的 payload 轉成可讀的文字，作為 prompt 發給 Gemini
-        const prompt = `請根據下列行程資訊與偏好，產生詳細的行程安排，格式如下：Day0:\n地點1:xxx\n概述:\n交通方式:\n${JSON.stringify(p, null, 2)}`;
+        const prompt = `請根據下列行程資訊與偏好，產生詳細的行程安排，格式如下：Day0:\n地點1:xxx\n概述:\n交通方式:\n地點2:(如果有的話)....，縮排要到位${JSON.stringify(p, null, 2)}`;
         const gemResp = await fetch(`${API}/gemini`, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
