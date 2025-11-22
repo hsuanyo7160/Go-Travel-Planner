@@ -490,6 +490,41 @@
       if(!p.region){ alert('請輸入地區/城市'); return; }
       if(!p.start_date || p.days<=0){ alert('請在月曆選擇有效的日期區間'); return; }
 
+      // 嘗試先呼叫後端的 Gemini API（非同步），若成功會顯示回應文字
+      try{
+        // 將目前的 payload 轉成可讀的文字，作為 prompt 發給 Gemini
+        const prompt = `請根據下列行程資訊與偏好，產生詳細的行程安排，格式如下：Day0:\n地點1:xxx\n概述:\n交通方式:\n${JSON.stringify(p, null, 2)}`;
+        const gemResp = await fetch(`${API}/gemini`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ prompt: prompt, model: 'gemini-2.5-flash-lite' })
+        });
+        if(gemResp.ok){
+          const gdata = await gemResp.json();
+          console.log('Gemini reply:', gdata.text);
+          // 將 Gemini 回應傳回後端，儲存為 data 資料夾下的檔案（非阻塞）
+          try{
+            const safeName = (p.name || 'trip').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 60);
+            const filename = `${safeName}_${Date.now()}`;
+            const saveResp = await fetch(`${API}/gemini/save`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ filename: filename, name: p.name || filename, text: gdata.text || '', format: 'json' })
+            });
+            if(saveResp.ok){
+              const s = await saveResp.json();
+              console.log('Gemini saved to server:', s.path);
+            } else {
+              console.warn('Failed to save Gemini response', saveResp.status);
+            }
+          }catch(e){ console.warn('保存 Gemini 回應到伺服器失敗', e); }
+        } else {
+          console.warn('Gemini API error', gemResp.status);
+        }
+      }catch(e){
+        console.warn('Gemini call failed', e);
+      }
+
       // 保留一份本機草稿
       localStorage.setItem('travel_assistant_trip_v1', JSON.stringify({
         name:p.name, startDate:p.start_date, days:p.days, region:p.region, budget_twd:p.budget_twd,
