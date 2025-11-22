@@ -13,6 +13,7 @@ func main() {
 		fmt.Println("  go run . otm         # 測 OpenTripMap 附近景點")
 		fmt.Println("  go run . meteo       # 測 Open-Meteo 天氣")
 		fmt.Println("  go run . gemini      # 測 Gemini AI 內容生成")
+		fmt.Println("  go run . tomtom      # 測 tomtom API")
 		return
 	}
 
@@ -25,6 +26,8 @@ func main() {
 		test_openmeteo()
 	case "gemini":
 		test_gemini()
+	case "tomtom":
+		test_tomtom()
 	default:
 		log.Fatalf("未知指令: %s\n", os.Args[1])
 	}

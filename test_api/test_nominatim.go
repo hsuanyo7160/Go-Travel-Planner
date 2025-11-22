@@ -15,7 +15,7 @@ type NominatimResult struct {
 }
 
 func test_nominatim() {
-	city := "Taipei" // 想測別的城市就改這裡
+	city := "Eiffel tower" // 想測別的城市就改這裡
 
 	endpoint := "https://nominatim.openstreetmap.org/search"
 

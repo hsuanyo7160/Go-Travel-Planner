@@ -14,18 +14,18 @@ import (
 
 // ========== 資料模型 ==========
 type Trip struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Region      string    `json:"region"`
-	StartDate   string    `json:"start_date"`
-	Days        int       `json:"days"`
-	BudgetTWD   int       `json:"budget_twd"`
-	People      int       `json:"people"`
-	DailyHours  int       `json:"daily_hours"`
+	ID          int         `json:"id"`
+	Name        string      `json:"name"`
+	Region      string      `json:"region"`
+	StartDate   string      `json:"start_date"`
+	Days        int         `json:"days"`
+	BudgetTWD   int         `json:"budget_twd"`
+	People      int         `json:"people"`
+	DailyHours  int         `json:"daily_hours"`
 	Preferences Preferences `json:"preferences"`
-	Plan        []Day     `json:"plan"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Plan        []Day       `json:"plan"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
 type Preferences struct {
@@ -58,17 +58,17 @@ var (
 	trips    = make(map[int]*Trip)
 	tripsMux sync.RWMutex
 	nextID   = 1
-	dataFile = "trips_data.json"
+	dataFile = "../data/trips_data.json"
 )
 
 // ========== 主程式 ==========
 func main() {
 	// 載入既有資料
 	loadTrips()
-	
+
 	// 設定 Gin
 	r := gin.Default()
-	
+
 	// CORS 設定 - 允許前端跨域請求
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:8080", "*"},
@@ -76,7 +76,7 @@ func main() {
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
-		MaxAge:          12 * time.Hour,
+		MaxAge:           12 * time.Hour,
 	}))
 
 	// 靜態檔案服務 - 使用原本的 /static 資料夾
@@ -94,7 +94,7 @@ func main() {
 		api.POST("/trips", createTrip)
 		api.PUT("/trips/:id", updateTrip)
 		api.DELETE("/trips/:id", deleteTrip)
-		
+
 		// 健康檢查
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{
@@ -119,12 +119,12 @@ func main() {
 func getTrips(c *gin.Context) {
 	tripsMux.RLock()
 	defer tripsMux.RUnlock()
-	
+
 	tripList := make([]*Trip, 0, len(trips))
 	for _, t := range trips {
 		tripList = append(tripList, t)
 	}
-	
+
 	c.JSON(200, tripList)
 }
 
@@ -134,16 +134,16 @@ func getTrip(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Invalid ID"})
 		return
 	}
-	
+
 	tripsMux.RLock()
 	defer tripsMux.RUnlock()
-	
+
 	trip, exists := trips[id]
 	if !exists {
 		c.JSON(404, gin.H{"error": "Trip not found"})
 		return
 	}
-	
+
 	c.JSON(200, trip)
 }
 
@@ -153,25 +153,25 @@ func createTrip(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	tripsMux.Lock()
 	defer tripsMux.Unlock()
-	
+
 	trip.ID = nextID
 	trip.CreatedAt = time.Now()
 	trip.UpdatedAt = time.Now()
-	
+
 	// 自動展開日期
 	if trip.Plan == nil || len(trip.Plan) == 0 {
 		trip.Plan = expandDays(trip.StartDate, trip.Days)
 	}
-	
+
 	trips[trip.ID] = &trip
 	nextID++
-	
+
 	// 儲存到檔案
 	saveTrips()
-	
+
 	c.JSON(201, trip)
 }
 
@@ -181,22 +181,22 @@ func updateTrip(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Invalid ID"})
 		return
 	}
-	
+
 	var updateData Trip
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	tripsMux.Lock()
 	defer tripsMux.Unlock()
-	
+
 	trip, exists := trips[id]
 	if !exists {
 		c.JSON(404, gin.H{"error": "Trip not found"})
 		return
 	}
-	
+
 	// 更新欄位
 	trip.Name = updateData.Name
 	trip.Region = updateData.Region
@@ -208,9 +208,9 @@ func updateTrip(c *gin.Context) {
 	trip.Preferences = updateData.Preferences
 	trip.Plan = updateData.Plan
 	trip.UpdatedAt = time.Now()
-	
+
 	saveTrips()
-	
+
 	c.JSON(200, trip)
 }
 
@@ -220,18 +220,18 @@ func deleteTrip(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Invalid ID"})
 		return
 	}
-	
+
 	tripsMux.Lock()
 	defer tripsMux.Unlock()
-	
+
 	if _, exists := trips[id]; !exists {
 		c.JSON(404, gin.H{"error": "Trip not found"})
 		return
 	}
-	
+
 	delete(trips, id)
 	saveTrips()
-	
+
 	c.JSON(200, gin.H{"message": "Trip deleted"})
 }
 
@@ -240,7 +240,7 @@ func deleteTrip(c *gin.Context) {
 func expandDays(startDate string, days int) []Day {
 	result := make([]Day, days)
 	start, _ := time.Parse("2006-01-02", startDate)
-	
+
 	for i := 0; i < days; i++ {
 		date := start.AddDate(0, 0, i)
 		result[i] = Day{
@@ -249,7 +249,7 @@ func expandDays(startDate string, days int) []Day {
 			Items:    []Item{},
 		}
 	}
-	
+
 	return result
 }
 
@@ -263,15 +263,15 @@ func loadTrips() {
 		log.Printf("Error loading trips: %v", err)
 		return
 	}
-	
+
 	var loadedTrips map[int]*Trip
 	if err := json.Unmarshal(data, &loadedTrips); err != nil {
 		log.Printf("Error parsing trips data: %v", err)
 		return
 	}
-	
+
 	trips = loadedTrips
-	
+
 	// Find max ID
 	maxID := 0
 	for id := range trips {
@@ -280,7 +280,7 @@ func loadTrips() {
 		}
 	}
 	nextID = maxID + 1
-	
+
 	log.Printf("Loaded %d trips", len(trips))
 }
 
@@ -290,7 +290,7 @@ func saveTrips() {
 		log.Printf("Error marshaling trips: %v", err)
 		return
 	}
-	
+
 	if err := os.WriteFile(dataFile, data, 0644); err != nil {
 		log.Printf("Error saving trips: %v", err)
 		return
