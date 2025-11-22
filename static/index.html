@@ -490,6 +490,12 @@
       if(!p.region){ alert('請輸入地區/城市'); return; }
       if(!p.start_date || p.days<=0){ alert('請在月曆選擇有效的日期區間'); return; }
 
+      // 點擊後立即顯示按鈕 loading 狀態（避免在 Gemini 呼叫期間看起來沒回應）
+      const isUpdate = (els.tripSel.value !== 'new');
+      const _oldBtnText = els.btnSubmit.textContent;
+      els.btnSubmit.disabled = true;
+      els.btnSubmit.textContent = isUpdate ? '更新中…' : '建立中…';
+
       // 嘗試先呼叫後端的 Gemini API（非同步），若成功會顯示回應文字
       try{
         // 將目前的 payload 轉成可讀的文字，作為 prompt 發給 Gemini
@@ -531,12 +537,7 @@
         people:p.people, daily_hours:p.daily_hours, plan:{}
       }));
 
-      const isUpdate = (els.tripSel.value !== 'new');
       try{
-        els.btnSubmit.disabled = true;
-        const old = els.btnSubmit.textContent;
-        els.btnSubmit.textContent = isUpdate ? '更新中…' : '建立中…';
-
         let resp;
         if(isUpdate){
           const id = els.tripSel.value;

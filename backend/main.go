@@ -103,6 +103,7 @@ func main() {
 
 		api.POST("/gemini", callGemini)
 		api.POST("/gemini/save", saveGeminiToFile)
+		api.GET("/gemini/response", getGeminiResponse)
 
 		// 健康檢查
 		api.GET("/health", func(c *gin.Context) {
@@ -303,8 +304,13 @@ func saveGeminiToFile(c *gin.Context) {
 		ext = ".json"
 	}
 
-	if !strings.HasSuffix(name, ext) {
-		name = name + ext
+	// 若為 JSON 格式，固定檔名為 response.json（寫入 data/response.json）
+	if strings.ToLower(req.Format) == "json" {
+		name = "response" + ext
+	} else {
+		if !strings.HasSuffix(name, ext) {
+			name = name + ext
+		}
 	}
 
 	dest := filepath.Join("../data", name)
@@ -367,6 +373,29 @@ func saveGeminiToFile(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"path": dest})
+}
+
+// getGeminiResponse 讀取 data/response.json 並回傳 JSON 結構
+func getGeminiResponse(c *gin.Context) {
+	path := filepath.Join("../data", "response.json")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// 回傳空的結構
+			c.JSON(200, gin.H{"name": "", "response": []string{}})
+			return
+		}
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	var out interface{}
+	if err := json.Unmarshal(b, &out); err != nil {
+		// 若檔案不是合法 JSON，回傳原始文字
+		c.JSON(200, gin.H{"raw": string(b)})
+		return
+	}
+	c.JSON(200, out)
 }
 
 // ========== 輔助函數 ==========

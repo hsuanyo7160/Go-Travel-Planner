@@ -6,6 +6,18 @@
   <title>旅遊助手 — 互動規劃</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Chat bubble improvements: preserve newlines and wrap long lines */
+    .chat-container{ max-width:1100px; margin:1.5rem auto; }
+    .llm-pane, .user-pane{ overflow:auto; max-height:60vh; }
+    .msg{ margin-bottom: .75rem; }
+    .bubble{ background:#ffffff; border-radius:12px; padding:.75rem 1rem; box-shadow:0 6px 18px rgba(2,6,23,.06); max-width:78%; white-space:pre-wrap; word-break:break-word; line-height:1.6; }
+    .msg.llm .bubble{ background: linear-gradient(180deg,#fff,#fbfbff); color:#0f172a; }
+    .msg.user{ text-align:right; }
+    .msg.user .bubble{ background: linear-gradient(90deg,#dcfce7,#bbf7d0); display:inline-block; }
+    /* make bubbles readable on small screens */
+    @media (max-width:768px){ .bubble{ max-width:92%; } }
+  </style>
 </head>
 <body>
   <nav class="navbar navbar-expand-lg mb-3" style="background:linear-gradient(90deg,#ffffff,#fdebd0);">
@@ -36,13 +48,15 @@
         <input id="chatInput" class="form-control" placeholder="輸入你的問題或指示（例如：幫我調整行程）" />
         <button id="sendBtn" class="btn btn-primary">💬</button>
       </div>
+      <!-- Instant display: messages revealed immediately (no typing) -->
     </div>
   </main>
 
   <script>
-    // Simple chat UI logic (placeholder LLM responses)
+    // Chat UI with typewriter effect for saved responses
     const params = new URLSearchParams(location.search);
     const tripId = params.get('trip') || params.get('tripId') || null;
+    const API = '/api';
 
     document.getElementById('backBtn').addEventListener('click', ()=>{ location.href = '/web/'; });
 
@@ -51,13 +65,6 @@
     const input = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendBtn');
 
-    function appendLLM(text){
-      const el = document.createElement('div');
-      el.className = 'msg llm mb-3';
-      el.innerHTML = `<div class="bubble">${text}</div>`;
-      llmPane.appendChild(el);
-      llmPane.scrollTop = llmPane.scrollHeight;
-    }
     function appendUser(text){
       const el = document.createElement('div');
       el.className = 'msg user mb-3 text-end';
@@ -66,22 +73,88 @@
       userPane.scrollTop = userPane.scrollHeight;
     }
 
+    function appendLLMBubble(){
+      const el = document.createElement('div');
+      el.className = 'msg llm mb-3';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      el.appendChild(bubble);
+      llmPane.appendChild(el);
+      llmPane.scrollTop = llmPane.scrollHeight;
+      return bubble;
+    }
+
+    function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+    // Format message: escape HTML and preserve newlines as <br> (no bolding)
+    function escapeHtml(str){
+      return String(str).replace(/[&<>\"]/g, function(s){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]);
+      });
+    }
+
+    function formatMessageToHtml(text){
+      if(text == null) return '';
+      const normalized = String(text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+      // escape HTML first
+      let escaped = escapeHtml(normalized);
+      // convert Markdown bold **text** into <strong>text</strong>
+      // This removes the literal ** markers and renders bold safely.
+      escaped = escaped.replace(/\*\*(.+?)\*\*/g, function(_, p1){ return '<strong>' + p1 + '</strong>'; });
+      // convert lines that start with '* ' into a small bullet '• '
+      const lines = escaped.split('\n').map(line => {
+        const m = line.match(/^\s*\*\s+(.*)$/);
+        if(m){
+          return '• ' + m[1];
+        }
+        return line;
+      });
+      return lines.join('<br>');
+    }
+
+    // Instant display helper (renders safe HTML with line breaks)
+    function displayText(bubbleEl, text){
+      bubbleEl.innerHTML = formatMessageToHtml(text);
+      llmPane.scrollTop = llmPane.scrollHeight;
+    }
+
+    // Fetch saved response.json and play responses sequentially with typing effect
+    async function playSavedResponses(){
+      try{
+        const res = await fetch(`${API}/gemini/response`);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const data = await res.json();
+        const arr = data && data.response ? data.response : [];
+        if(!Array.isArray(arr) || arr.length===0) {
+          // show welcome message
+          const b = appendLLMBubble();
+          await typeText(b, `歡迎！${tripId ? '正在編輯行程 ID: ' + tripId : '尚未指定行程' }，請輸入你的需求或問題。`, 20);
+          return;
+        }
+
+        // play each response with pause between
+        for(const txt of arr){
+          const bubble = appendLLMBubble();
+          displayText(bubble, txt);
+        }
+      }catch(err){
+        console.warn('load responses failed', err);
+        const b = appendLLMBubble();
+        await typeText(b, `歡迎！${tripId ? '正在編輯行程 ID: ' + tripId : '尚未指定行程' }，請輸入你的需求或問題。`, 20);
+      }
+    }
+
+    // send button behaviour (user can send messages)
     sendBtn.addEventListener('click', async ()=>{
       const txt = input.value.trim(); if(!txt) return; input.value = '';
       appendUser(txt);
-      // Simulate LLM typing / response
-      appendLLM('<i>思考中…</i>');
-      setTimeout(()=>{
-        // replace last LLM placeholder
-        const last = llmPane.querySelector('.llm:last-child .bubble');
-        if(last) last.innerHTML = `（trip ${tripId || 'N/A'}）我收到你的指示：<strong>${txt}</strong>；這裡示範回覆，你可以進一步要求修改行程或加入景點。`;
-        // also append a follow-up suggestion
-        appendLLM('建議：要我把第 2 日調整為半日輕鬆行程嗎？');
-      }, 900);
+      const b = appendLLMBubble();
+      displayText(b, '（正在將您的問題送出…）');
     });
+    // No speed controls: messages show instantly
 
-    // If you want, pre-populate an initial assistant message
-    appendLLM(`歡迎！${tripId ? '正在編輯行程 ID: ' + tripId : '尚未指定行程' }，請輸入你的需求或問題。`);
+    // Start
+    document.addEventListener('DOMContentLoaded', ()=>{ playSavedResponses(); });
   </script>
 </body>
 </html>
