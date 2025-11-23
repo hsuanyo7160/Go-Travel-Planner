@@ -1,25 +1,31 @@
 package main
 
 import (
-	//"context"
-	"encoding/json"
-	"fmt"
-	"log"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
+		"context"
+		"encoding/json"
+		"fmt"
+		"log"
+		"os"
+		"path/filepath"
+		"regexp"
+		"strconv"
+		"strings"
+		"sync"
+		"time"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	"google.golang.org/genai"
+		"github.com/gin-contrib/cors"
+		"github.com/gin-gonic/gin"
+		"google.golang.org/genai"
+
+		"go.mongodb.org/mongo-driver/bson"
+  	"go.mongodb.org/mongo-driver/mongo"
+	  "go.mongodb.org/mongo-driver/mongo/options"
+		"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ========== 資料模型 ==========
 type Trip struct {
+	MongoID    primitive.ObjectID `bson:"_id,omitempty" json:"-"`
 	ID          int         `json:"id"`
 	Name        string      `json:"name"`
 	Region      string      `json:"region"`
@@ -67,8 +73,32 @@ var (
 	dataFile = "../data/trips_data.json"
 )
 
+// ========== MongoDB ==========
+// 新增：MongoDB 連線變數
+var mongoClient *mongo.Client
+var tripsCollection *mongo.Collection
+
+func initMongo() {
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+    if err != nil {
+        log.Fatalf("MongoDB connect error: %v", err)
+    }
+
+    // 可以決定 db / collection 名稱
+    mongoClient = client
+    tripsCollection = client.Database("go_travel").Collection("trips")
+
+    log.Println("MongoDB connected")
+}
+
 // ========== 主程式 ==========
 func main() {
+	// 先連 MongoDB
+	initMongo()
+
 	// 載入既有資料
 	loadTrips()
 
@@ -127,16 +157,37 @@ func main() {
 // ========== API Handlers ==========
 
 func getTrips(c *gin.Context) {
-	tripsMux.RLock()
-	defer tripsMux.RUnlock()
+    // === 優先：MongoDB ===
+    cursor, err := tripsCollection.Find(context.Background(), bson.M{})
+    if err == nil {
+        var tripList []*Trip
+        for cursor.Next(context.Background()) {
+            var t Trip
+            if err := cursor.Decode(&t); err == nil {
+                tripList = append(tripList, &t)
+            }
+        }
+        cursor.Close(context.Background())
 
-	tripList := make([]*Trip, 0, len(trips))
-	for _, t := range trips {
-		tripList = append(tripList, t)
-	}
+        // 若 Mongo 有資料，直接回傳
+        if len(tripList) > 0 {
+            c.JSON(200, tripList)
+            return
+        }
+    }
 
-	c.JSON(200, tripList)
+    // === 如果 Mongo 沒資料 → fallback 回 map ===
+    tripsMux.RLock()
+    defer tripsMux.RUnlock()
+
+    tripList := make([]*Trip, 0, len(trips))
+    for _, t := range trips {
+        tripList = append(tripList, t)
+    }
+
+    c.JSON(200, tripList)
 }
+
 
 func getTrip(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -158,32 +209,58 @@ func getTrip(c *gin.Context) {
 }
 
 func createTrip(c *gin.Context) {
-	var trip Trip
-	if err := c.ShouldBindJSON(&trip); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
+    var trip Trip
+    if err := c.ShouldBindJSON(&trip); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
 
-	tripsMux.Lock()
-	defer tripsMux.Unlock()
+    tripsMux.Lock()
+    defer tripsMux.Unlock()
 
-	trip.ID = nextID
-	trip.CreatedAt = time.Now()
-	trip.UpdatedAt = time.Now()
+    // === 自動產生 Trip ID ===
+    trip.ID = int(time.Now().Unix())
+    trip.MongoID = primitive.NewObjectID()
 
-	// 自動展開日期
-	if trip.Plan == nil || len(trip.Plan) == 0 {
-		trip.Plan = expandDays(trip.StartDate, trip.Days)
-	}
+    trip.CreatedAt = time.Now()
+    trip.UpdatedAt = time.Now()
 
-	trips[trip.ID] = &trip
-	nextID++
+    if trip.Plan == nil || len(trip.Plan) == 0 {
+        trip.Plan = expandDays(trip.StartDate, trip.Days)
+    }
 
-	// 儲存到檔案
-	saveTrips()
+    // === 寫入 MongoDB（顯式欄位） ===
+    result, err := tripsCollection.InsertOne(context.Background(), bson.M{
+        "_id":         trip.MongoID,
+        "id":          trip.ID,
+        "name":        trip.Name,
+        "region":      trip.Region,
+        "start_date":  trip.StartDate,
+        "days":        trip.Days,
+        "budget_twd":  trip.BudgetTWD,
+        "people":      trip.People,
+        "daily_hours": trip.DailyHours,
+        "preferences": trip.Preferences,
+        "plan":        trip.Plan,
+        "created_at":  trip.CreatedAt,
+        "updated_at":  trip.UpdatedAt,
+    })
+    if err != nil {
+			  log.Println("InsertOne error:", err)
+        c.JSON(500, gin.H{"error": err.Error()})
+        return
+    }
 
-	c.JSON(201, trip)
+		log.Println("InsertOne result:", result.InsertedID)
+
+    // === 本地 map 仍然保留 ===
+    trips[trip.ID] = &trip
+    nextID++
+    saveTrips()
+
+    c.JSON(201, trip)
 }
+
 
 func updateTrip(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
