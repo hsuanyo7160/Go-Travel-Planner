@@ -10,7 +10,7 @@ import (
 		"regexp"
 		"strconv"
 		"strings"
-		"sync"
+		// "sync"
 		"time"
 
 		"github.com/gin-contrib/cors"
@@ -65,16 +65,7 @@ type Item struct {
 	Note        string  `json:"note"`
 }
 
-// ========== 資料存儲 ==========
-var (
-	trips    = make(map[int]*Trip)
-	tripsMux sync.RWMutex
-	nextID   = 1
-	dataFile = "../data/trips_data.json"
-)
-
 // ========== MongoDB ==========
-// 新增：MongoDB 連線變數
 var mongoClient *mongo.Client
 var tripsCollection *mongo.Collection
 
@@ -96,11 +87,8 @@ func initMongo() {
 
 // ========== 主程式 ==========
 func main() {
-	// 先連 MongoDB
+	// 連線 MongoDB
 	initMongo()
-
-	// 載入既有資料
-	loadTrips()
 
 	// 設定 Gin
 	r := gin.Default()
@@ -157,37 +145,23 @@ func main() {
 // ========== API Handlers ==========
 
 func getTrips(c *gin.Context) {
-    // === 優先：MongoDB ===
-    cursor, err := tripsCollection.Find(context.Background(), bson.M{})
-    if err == nil {
-        var tripList []*Trip
-        for cursor.Next(context.Background()) {
-            var t Trip
-            if err := cursor.Decode(&t); err == nil {
-                tripList = append(tripList, &t)
-            }
-        }
-        cursor.Close(context.Background())
+	cursor, err := tripsCollection.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	defer cursor.Close(context.Background())
 
-        // 若 Mongo 有資料，直接回傳
-        if len(tripList) > 0 {
-            c.JSON(200, tripList)
-            return
-        }
-    }
+	var tripList []Trip
+	for cursor.Next(context.Background()) {
+		var t Trip
+		if err := cursor.Decode(&t); err == nil {
+			tripList = append(tripList, t)
+		}
+	}
 
-    // === 如果 Mongo 沒資料 → fallback 回 map ===
-    tripsMux.RLock()
-    defer tripsMux.RUnlock()
-
-    tripList := make([]*Trip, 0, len(trips))
-    for _, t := range trips {
-        tripList = append(tripList, t)
-    }
-
-    c.JSON(200, tripList)
+	c.JSON(200, tripList)
 }
-
 
 func getTrip(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -196,11 +170,9 @@ func getTrip(c *gin.Context) {
 		return
 	}
 
-	tripsMux.RLock()
-	defer tripsMux.RUnlock()
-
-	trip, exists := trips[id]
-	if !exists {
+	var trip Trip
+	err = tripsCollection.FindOne(context.Background(), bson.M{"id": id}).Decode(&trip)
+	if err != nil {
 		c.JSON(404, gin.H{"error": "Trip not found"})
 		return
 	}
@@ -209,58 +181,28 @@ func getTrip(c *gin.Context) {
 }
 
 func createTrip(c *gin.Context) {
-    var trip Trip
-    if err := c.ShouldBindJSON(&trip); err != nil {
-        c.JSON(400, gin.H{"error": err.Error()})
-        return
-    }
+	var trip Trip
+	if err := c.ShouldBindJSON(&trip); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 
-    tripsMux.Lock()
-    defer tripsMux.Unlock()
+	trip.ID = int(time.Now().Unix())
+	trip.CreatedAt = time.Now()
+	trip.UpdatedAt = time.Now()
 
-    // === 自動產生 Trip ID ===
-    trip.ID = int(time.Now().Unix())
-    trip.MongoID = primitive.NewObjectID()
+	if trip.Plan == nil || len(trip.Plan) == 0 {
+		trip.Plan = expandDays(trip.StartDate, trip.Days)
+	}
 
-    trip.CreatedAt = time.Now()
-    trip.UpdatedAt = time.Now()
+	_, err := tripsCollection.InsertOne(context.Background(), trip)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
 
-    if trip.Plan == nil || len(trip.Plan) == 0 {
-        trip.Plan = expandDays(trip.StartDate, trip.Days)
-    }
-
-    // === 寫入 MongoDB（顯式欄位） ===
-    result, err := tripsCollection.InsertOne(context.Background(), bson.M{
-        "_id":         trip.MongoID,
-        "id":          trip.ID,
-        "name":        trip.Name,
-        "region":      trip.Region,
-        "start_date":  trip.StartDate,
-        "days":        trip.Days,
-        "budget_twd":  trip.BudgetTWD,
-        "people":      trip.People,
-        "daily_hours": trip.DailyHours,
-        "preferences": trip.Preferences,
-        "plan":        trip.Plan,
-        "created_at":  trip.CreatedAt,
-        "updated_at":  trip.UpdatedAt,
-    })
-    if err != nil {
-			  log.Println("InsertOne error:", err)
-        c.JSON(500, gin.H{"error": err.Error()})
-        return
-    }
-
-		log.Println("InsertOne result:", result.InsertedID)
-
-    // === 本地 map 仍然保留 ===
-    trips[trip.ID] = &trip
-    nextID++
-    saveTrips()
-
-    c.JSON(201, trip)
+	c.JSON(201, trip)
 }
-
 
 func updateTrip(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -275,30 +217,32 @@ func updateTrip(c *gin.Context) {
 		return
 	}
 
-	tripsMux.Lock()
-	defer tripsMux.Unlock()
+	updateData.UpdatedAt = time.Now()
 
-	trip, exists := trips[id]
-	if !exists {
-		c.JSON(404, gin.H{"error": "Trip not found"})
+	update := bson.M{
+		"name":        updateData.Name,
+		"region":      updateData.Region,
+		"start_date":  updateData.StartDate,
+		"days":        updateData.Days,
+		"budget_twd":  updateData.BudgetTWD,
+		"people":      updateData.People,
+		"daily_hours": updateData.DailyHours,
+		"preferences": updateData.Preferences,
+		"plan":        updateData.Plan,
+		"updated_at":  updateData.UpdatedAt,
+	}
+
+	_, err = tripsCollection.UpdateOne(
+		context.Background(),
+		bson.M{"id": id},
+		bson.M{"$set": update},
+	)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 更新欄位
-	trip.Name = updateData.Name
-	trip.Region = updateData.Region
-	trip.StartDate = updateData.StartDate
-	trip.Days = updateData.Days
-	trip.BudgetTWD = updateData.BudgetTWD
-	trip.People = updateData.People
-	trip.DailyHours = updateData.DailyHours
-	trip.Preferences = updateData.Preferences
-	trip.Plan = updateData.Plan
-	trip.UpdatedAt = time.Now()
-
-	saveTrips()
-
-	c.JSON(200, trip)
+	c.JSON(200, gin.H{"message": "Trip updated"})
 }
 
 func deleteTrip(c *gin.Context) {
@@ -308,16 +252,11 @@ func deleteTrip(c *gin.Context) {
 		return
 	}
 
-	tripsMux.Lock()
-	defer tripsMux.Unlock()
-
-	if _, exists := trips[id]; !exists {
-		c.JSON(404, gin.H{"error": "Trip not found"})
+	_, err = tripsCollection.DeleteOne(context.Background(), bson.M{"id": id})
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-
-	delete(trips, id)
-	saveTrips()
 
 	c.JSON(200, gin.H{"message": "Trip deleted"})
 }
@@ -491,48 +430,4 @@ func expandDays(startDate string, days int) []Day {
 	}
 
 	return result
-}
-
-func loadTrips() {
-	data, err := os.ReadFile(dataFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Println("No existing data file, starting fresh")
-			return
-		}
-		log.Printf("Error loading trips: %v", err)
-		return
-	}
-
-	var loadedTrips map[int]*Trip
-	if err := json.Unmarshal(data, &loadedTrips); err != nil {
-		log.Printf("Error parsing trips data: %v", err)
-		return
-	}
-
-	trips = loadedTrips
-
-	// Find max ID
-	maxID := 0
-	for id := range trips {
-		if id > maxID {
-			maxID = id
-		}
-	}
-	nextID = maxID + 1
-
-	log.Printf("Loaded %d trips", len(trips))
-}
-
-func saveTrips() {
-	data, err := json.MarshalIndent(trips, "", "  ")
-	if err != nil {
-		log.Printf("Error marshaling trips: %v", err)
-		return
-	}
-
-	if err := os.WriteFile(dataFile, data, 0644); err != nil {
-		log.Printf("Error saving trips: %v", err)
-		return
-	}
 }
