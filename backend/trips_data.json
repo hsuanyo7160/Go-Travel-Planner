@@ -1,0 +1,21 @@
+{
+  "2": {
+    "id": 2,
+    "name": "台北5日遊",
+    "region": "台北",
+    "start_date": "2025-11-12",
+    "days": 5,
+    "budget_twd": 6000,
+    "people": 1,
+    "daily_hours": 4,
+    "preferences": {
+      "pace": "",
+      "types": null,
+      "transport": null,
+      "dining": null
+    },
+    "plan": [],
+    "created_at": "2025-11-17T17:48:51.4491506+08:00",
+    "updated_at": "2025-11-17T22:36:58.1678421+08:00"
+  }
+}
