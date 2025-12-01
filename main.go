@@ -12,13 +12,13 @@ import (
 func main() {
 	fmt.Println("Starting Go-Travel-Planner...")
 	fmt.Println("================================")
-	
+
 	// 切換到 backend 目錄並執行
 	cmd := exec.Command("go", "run", "main.go")
 	cmd.Dir = "./backend"
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		log.Fatal(err)
 	}

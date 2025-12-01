@@ -1,43 +1,44 @@
 package main
 
 import (
-		"context"
-		"encoding/json"
-		"fmt"
-		"log"
-		"os"
-		"path/filepath"
-		"regexp"
-		"strconv"
-		"strings"
-		// "sync"
-		"time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 
-		"github.com/gin-contrib/cors"
-		"github.com/gin-gonic/gin"
-		"google.golang.org/genai"
+	// "sync"
+	"time"
 
-		"go.mongodb.org/mongo-driver/bson"
-  	"go.mongodb.org/mongo-driver/mongo"
-	  "go.mongodb.org/mongo-driver/mongo/options"
-		"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"google.golang.org/genai"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ========== 資料模型 ==========
 type Trip struct {
-	MongoID    primitive.ObjectID `bson:"_id,omitempty" json:"-"`
-	ID          int         `json:"id"`
-	Name        string      `json:"name"`
-	Region      string      `json:"region"`
-	StartDate   string      `json:"start_date"`
-	Days        int         `json:"days"`
-	BudgetTWD   int         `json:"budget_twd"`
-	People      int         `json:"people"`
-	DailyHours  int         `json:"daily_hours"`
-	Preferences Preferences `json:"preferences"`
-	Plan        []Day       `json:"plan"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	MongoID     primitive.ObjectID `bson:"_id,omitempty" json:"-"`
+	ID          int                `json:"id"`
+	Name        string             `json:"name"`
+	Region      string             `json:"region"`
+	StartDate   string             `json:"start_date"`
+	Days        int                `json:"days"`
+	BudgetTWD   int                `json:"budget_twd"`
+	People      int                `json:"people"`
+	DailyHours  int                `json:"daily_hours"`
+	Preferences Preferences        `json:"preferences"`
+	Plan        []Day              `json:"plan"`
+	CreatedAt   time.Time          `json:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at"`
 }
 
 type Preferences struct {
@@ -70,19 +71,19 @@ var mongoClient *mongo.Client
 var tripsCollection *mongo.Collection
 
 func initMongo() {
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
-    if err != nil {
-        log.Fatalf("MongoDB connect error: %v", err)
-    }
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		log.Fatalf("MongoDB connect error: %v", err)
+	}
 
-    // 可以決定 db / collection 名稱
-    mongoClient = client
-    tripsCollection = client.Database("go_travel").Collection("trips")
+	// 可以決定 db / collection 名稱
+	mongoClient = client
+	tripsCollection = client.Database("go_travel").Collection("trips")
 
-    log.Println("MongoDB connected")
+	log.Println("MongoDB connected")
 }
 
 // ========== 主程式 ==========
