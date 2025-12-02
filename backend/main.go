@@ -16,14 +16,10 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-<<<<<<< HEAD
-	"google.golang.org/genai"
-=======
 
 	//"google.golang.org/genai"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
->>>>>>> ea9662a4000e3421d4a010b71d0213adf7c2dc96
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
