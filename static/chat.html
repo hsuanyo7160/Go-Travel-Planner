@@ -78,111 +78,160 @@
   </main>
 
   <script>
-    // Chat UI with typewriter effect for saved responses
-    const params = new URLSearchParams(location.search);
-    const tripId = params.get('trip') || params.get('tripId') || null;
+    // ====== 1. 基礎設定 ======
     const API = '/api';
+    const params = new URLSearchParams(location.search);
+    const rawId = params.get('trip') || params.get('tripId');
+    // 如果沒有 ID，就設為 null
+    const tripId = (rawId && rawId !== 'undefined' && rawId !== 'null') ? rawId : null;
+    const STORAGE_KEY = `chat_history_${tripId}`;
+    let chatHistory = []; 
 
     document.getElementById('backBtn').addEventListener('click', ()=>{ location.href = '/web/'; });
-
     const llmPane = document.getElementById('llmPane');
     const input = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendBtn');
 
-    function appendUser(text){
-      const el = document.createElement('div');
-      el.className = 'msg user mb-3';
-      const bubble = document.createElement('div');
-      bubble.className = 'bubble user-bubble d-inline-block';
-      bubble.innerHTML = formatMessageToHtml(text);
-      el.appendChild(bubble);
-      // append into the main llmPane so conversation is not split
-      llmPane.appendChild(el);
-      llmPane.scrollTop = llmPane.scrollHeight;
-    }
-
-    function appendLLMBubble(){
-      const el = document.createElement('div');
-      el.className = 'msg llm mb-3';
-      const bubble = document.createElement('div');
-      bubble.className = 'bubble';
-      el.appendChild(bubble);
-      llmPane.appendChild(el);
-      llmPane.scrollTop = llmPane.scrollHeight;
-      return bubble;
-    }
-
-    function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-    // Format message: escape HTML and preserve newlines as <br> (no bolding)
-    function escapeHtml(str){
-      return String(str).replace(/[&<>\"]/g, function(s){
-        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]);
-      });
-    }
-
+    // ====== 2. UI 渲染工具 ======
     function formatMessageToHtml(text){
-      if(text == null) return '';
-      const normalized = String(text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-      // escape HTML first
-      let escaped = escapeHtml(normalized);
-      // convert Markdown bold **text** into <strong>text</strong>
-      // This removes the literal ** markers and renders bold safely.
-      escaped = escaped.replace(/\*\*(.+?)\*\*/g, function(_, p1){ return '<strong>' + p1 + '</strong>'; });
-      // convert lines that start with '* ' into a small bullet '• '
-      const lines = escaped.split('\n').map(line => {
-        const m = line.match(/^\s*\*\s+(.*)$/);
-        if(m){
-          return '• ' + m[1];
-        }
-        return line;
-      });
-      return lines.join('<br>');
+      if(!text) return '';
+      let escaped = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      escaped = escaped.replace(/### (.*)/g, '<h4>$1</h4>'); // 標題
+      return escaped.split('\n').map(line => line.match(/^\s*\*\s+(.*)$/) ? '• ' + RegExp.$1 : line).join('<br>');
+    }
+    
+    function createBubble(role, text) {
+        const el = document.createElement('div'); 
+        el.className = `msg ${role} mb-3`;
+        const bubble = document.createElement('div'); 
+        bubble.className = `bubble ${role==='user'?'user-bubble d-inline-block':''}`;
+        bubble.innerHTML = formatMessageToHtml(text);
+        el.appendChild(bubble);
+        llmPane.appendChild(el);
+        llmPane.scrollTop = llmPane.scrollHeight;
+        return bubble;
+    }
+    
+    // 用來更新泡泡內容 (例如從 "思考中" 變成 "結果")
+    function displayText(bubble, text) { 
+        bubble.innerHTML = formatMessageToHtml(text); 
+        llmPane.scrollTop = llmPane.scrollHeight; 
+    }
+    
+    function saveHistory() { 
+        if(tripId) localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory)); 
     }
 
-    // Instant display helper (renders safe HTML with line breaks)
-    function displayText(bubbleEl, text){
-      bubbleEl.innerHTML = formatMessageToHtml(text);
-      llmPane.scrollTop = llmPane.scrollHeight;
+    // ====== 3. 與後端溝通 (發送訊息) ======
+    async function sendMessage(text, isAutoTrigger = false) {
+        if(!text) return;
+        
+        // 只有使用者手動輸入時，才顯示使用者的泡泡
+        if (!isAutoTrigger) {
+            createBubble('user', text);
+        }
+        
+        chatHistory.push({ role: 'user', text: text });
+        saveHistory();
+
+        // 顯示 Loading 泡泡
+        const loadingBubble = createBubble('llm', '（正在思考與規劃...）');
+
+        try {
+            const res = await fetch(`${API}/gemini/chat`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text, history: chatHistory })
+            });
+            
+            if(!res.ok) throw new Error("API Error: " + res.status);
+
+            const data = await res.json();
+            const reply = data.reply || '(無回應)';
+            
+            displayText(loadingBubble, reply);
+            chatHistory.push({ role: 'model', text: reply });
+            saveHistory();
+        } catch (e) {
+            displayText(loadingBubble, '發生錯誤：' + e.message);
+            console.error(e);
+        }
     }
 
-    // Fetch saved response.json and play responses sequentially with typing effect
-    async function playSavedResponses(){
-      try{
-        const res = await fetch(`${API}/gemini/response`);
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        const data = await res.json();
-        const arr = data && data.response ? data.response : [];
-        if(!Array.isArray(arr) || arr.length===0) {
-          // show welcome message
-          const b = appendLLMBubble();
-          await typeText(b, `歡迎！${tripId ? '正在編輯行程 ID: ' + tripId : '尚未指定行程' }，請輸入你的需求或問題。`, 20);
-          return;
+    // ====== 4. 初始化 (進來頁面時執行) ======
+    async function initChat() {
+        if (!tripId) {
+            createBubble('llm', "👋 你好！網址似乎缺少行程 ID。<br>請回到上一頁重新建立行程。");
+            return;
         }
 
-        // play each response with pause between
-        for(const txt of arr){
-          const bubble = appendLLMBubble();
-          displayText(bubble, txt);
+        const saved = localStorage.getItem(STORAGE_KEY);
+
+        if (saved) {
+            // A. 有舊紀錄：載入並顯示
+            try {
+                chatHistory = JSON.parse(saved);
+                if(chatHistory.length > 0) {
+                    chatHistory.forEach(msg => {
+                        // 過濾掉系統指令，只顯示正常的對話
+                        if (!msg.text.startsWith('SYSTEM_prompt:')) {
+                            createBubble(msg.role, msg.text);
+                        }
+                    });
+                    // 如果載入完沒東西 (例如只有隱藏指令)，補個歡迎詞
+                    // if(llmPane.children.length === 0) createBubble('llm', "歡迎回來！");
+                } else {
+                    // 有 key 但內容是空陣列
+                    startNewPlanning();
+                }
+            } catch(e) {
+                console.error("History parse error", e);
+                startNewPlanning();
+            }
+        } else {
+            // B. 無紀錄：開始新規劃
+            startNewPlanning();
         }
-      }catch(err){
-        console.warn('load responses failed', err);
-        const b = appendLLMBubble();
-        await typeText(b, `歡迎！${tripId ? '正在編輯行程 ID: ' + tripId : '尚未指定行程' }，請輸入你的需求或問題。`, 20);
-      }
     }
 
-    // send button behaviour (user can send messages)
-    sendBtn.addEventListener('click', async ()=>{
-      const txt = input.value.trim(); if(!txt) return; input.value = '';
-      appendUser(txt);
-      const b = appendLLMBubble();
-      displayText(b, '（正在將您的問題送出…）');
-    });
-    // No speed controls: messages show instantly
+    // 開始全新的規劃流程
+    async function startNewPlanning() {
+        const bubble = createBubble('llm', "正在讀取您的行程設定...");
+        
+        try {
+            // 1. 去資料庫抓使用者的設定 (index.html 存的那份)
+            const res = await fetch(`${API}/trips/${tripId}`);
+            if (res.ok) {
+                const tripData = await res.json();
+                
+                // 更新泡泡文字
+                displayText(bubble, `嗨！我看到您想去 **${tripData.region}** 玩 ${tripData.days} 天。\n我正在根據您的偏好（${tripData.preferences?.pace || '適中'}、${tripData.preferences?.types?.join('/') || '無'}）為您規劃...`);
+                
+                // 2. 組裝指令給 AI (這段使用者看不到)
+                const prompt = `SYSTEM_prompt: 請扮演專業導遊。
+這是使用者的行程需求 JSON：${JSON.stringify(tripData)}
+請根據此資訊，規劃一份詳細的${tripData.days}天行程。
+請用繁體中文，條列式呈現，包含每天的景點、餐飲建議。
+請直接開始規劃，不用解釋。`;
+                
+                // 3. 自動發送
+                await sendMessage(prompt, true);
+                
+            } else {
+                displayText(bubble, `找不到行程資料 (ID: ${tripId})。請確認是否已建立。`);
+            }
+        } catch (e) { 
+            console.error(e);
+            displayText(bubble, "連線錯誤，無法讀取行程。");
+        }
+    }
 
-    // Start
-    document.addEventListener('DOMContentLoaded', ()=>{ playSavedResponses(); });
+    sendBtn.addEventListener('click', () => { const t=input.value.trim(); input.value=''; sendMessage(t); });
+    input.addEventListener('keypress', (e) => { if(e.key==='Enter'){ const t=input.value.trim(); input.value=''; sendMessage(t); } });
+
+    // 啟動
+    document.addEventListener('DOMContentLoaded', initChat);
   </script>
 </body>
 </html>

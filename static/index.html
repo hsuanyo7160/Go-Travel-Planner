@@ -207,7 +207,7 @@
   </main>
 
   <script>
-    // Hero CTA -> 滾動到表單區塊
+    // ====== 0. Hero 區塊邏輯 ======
     document.addEventListener('DOMContentLoaded', function(){
       const btn = document.getElementById('heroBtn');
       if(btn){
@@ -216,17 +216,17 @@
           if(main) main.scrollIntoView({behavior:'smooth'});
         });
       }
-      // ====== Hero slideshow ======
+      
+      // Hero 圖片輪播
       (function heroSlideshow(){
         const images = [
           'Source_img/image1.jpg',
           'Source_img/image2.jpg'
         ];
-        const intervalMs = 10000; // 10 seconds
+        const intervalMs = 10000;
         const container = document.querySelector('.hero-slides');
         if(!container || !images || images.length===0) return;
 
-        // Create slide elements
         const slides = images.map((src,i)=>{
           const d = document.createElement('div');
           d.className = 'hero-slide'+(i===0? ' active':'');
@@ -244,78 +244,63 @@
         }, intervalMs);
       })();
     });
-  </script>
-
-  <script>
-    // ====== 狀態（LocalStorage） ======
+    // ====== 1. 設定 ======
     const storeKey = 'travel_assistant_trip_setup_v1';
-    let state = loadState() || {
+    const API = "/api";
+    
+    // 狀態初始化
+    let state = tryLoadState() || {
       name: '', region: '', budget: 0, people: 1, dailyHours: 8,
       year: new Date().getFullYear(), month: new Date().getMonth()+1,
       startDay: null, endDay: null,
       prefs: { pace: '適中', types: [], transport: [], dining: [] }
     };
 
+    function tryLoadState(){ try{ return JSON.parse(localStorage.getItem(storeKey)||''); }catch{ return null; } }
     function saveState(){ localStorage.setItem(storeKey, JSON.stringify(state)); renderPreview(); }
-    function loadState(){ try{ return JSON.parse(localStorage.getItem(storeKey)||''); }catch{ return null; } }
 
-    // 後端 API base (使用相對路徑)
-    const API = "/api";
-
-    // ====== 元件 ======
+    // ====== 2. DOM 元素 ======
     const els = {
-      tripName: document.getElementById('tripName'),
-      region: document.getElementById('region'),
-      budget: document.getElementById('budget'),
-      budgetInc: document.getElementById('budgetInc'), // 可不存在，程式有保護
-      budgetDec: document.getElementById('budgetDec'),
-      people: document.getElementById('people'),
-      dailyHours: document.getElementById('dailyHours'),
-      yearSel: document.getElementById('yearSel'),
-      monthSel: document.getElementById('monthSel'),
-      calendar: document.getElementById('calendar'),
-      startText: document.getElementById('startText'),
-      endText: document.getElementById('endText'),
-      daysText: document.getElementById('daysText'),
-      btnSubmit: document.getElementById('btnSubmit'),
-      btnDelete: document.getElementById('btnDelete'),
-      pName: document.getElementById('pName'),
-      pRegion: document.getElementById('pRegion'),
-      pDate: document.getElementById('pDate'),
-      pDays: document.getElementById('pDays'),
-      pPeople: document.getElementById('pPeople'),
-      pHours: document.getElementById('pHours'),
+      tripName: document.getElementById('tripName'), region: document.getElementById('region'),
+      budget: document.getElementById('budget'), people: document.getElementById('people'), dailyHours: document.getElementById('dailyHours'),
+      yearSel: document.getElementById('yearSel'), monthSel: document.getElementById('monthSel'), calendar: document.getElementById('calendar'),
+      startText: document.getElementById('startText'), endText: document.getElementById('endText'), daysText: document.getElementById('daysText'),
+      btnSubmit: document.getElementById('btnSubmit'), btnDelete: document.getElementById('btnDelete'),
       jsonPreview: document.getElementById('jsonPreview'),
-      pace: document.getElementById('pace'),
-      types: document.getElementById('types'),
-      transport: document.getElementById('transport'),
-      dining: document.getElementById('dining'),
-      resetDates: document.getElementById('btnResetDates'),
-      tripSel: document.getElementById('tripSel'),
+      pace: document.getElementById('pace'), types: document.getElementById('types'), transport: document.getElementById('transport'), dining: document.getElementById('dining'),
+      resetDates: document.getElementById('btnResetDates'), tripSel: document.getElementById('tripSel'),
+      pName: document.getElementById('pName'), pRegion: document.getElementById('pRegion'), pDate: document.getElementById('pDate'),
+      pDays: document.getElementById('pDays'), pPeople: document.getElementById('pPeople'), pHours: document.getElementById('pHours')
     };
 
-    // ====== 初始化下拉（年/月） ======
-    (function initYearMonth(){
-      const y = state.year; const m = state.month;
-      const nowY = new Date().getFullYear();
-      const years = [];
-      for(let i=-1;i<=3;i++) years.push(nowY+i);
-      els.yearSel.innerHTML = years.map(v=>`<option ${v===y?'selected':''}>${v}</option>`).join('');
-      els.monthSel.innerHTML = Array.from({length:12},(_,i)=>i+1).map(v=>`<option ${v===m?'selected':''}>${v}</option>`).join('');
-    })();
+    // ====== 3. 輔助函式 ======
+    
+    // 🟢 [關鍵修改] 強制更新按鈕狀態的函式
+    function updateButtonUI() {
+        const isNew = (!els.tripSel.value || els.tripSel.value === 'new');
+        if (isNew) {
+            els.btnSubmit.textContent = '建立行程';
+            els.btnSubmit.className = 'btn btn-primary'; // 藍色
+            if(els.btnDelete) els.btnDelete.disabled = true;
+        } else {
+            els.btnSubmit.textContent = '更新行程';
+            els.btnSubmit.className = 'btn btn-success'; // 綠色
+            if(els.btnDelete) els.btnDelete.disabled = false;
+        }
+    }
 
-    // ====== 偏好選項 ======
-    const paceOpts = ['悠閒','適中','緊湊'];
-    const typeOpts = ['景點','美食','購物','自然','博物館','夜生活','親子','展演'];
-    const transportOpts = ['步行','大眾運輸','計程車','自駕'];
-    const diningOpts = ['在地小吃','米其林/評鑑','平價優先','素食友善'];
+    function initYearMonth(){
+      const y = state.year; const m = state.month; const nowY = new Date().getFullYear();
+      els.yearSel.innerHTML = [-1,0,1,2,3].map(i=>`<option ${nowY+i===y?'selected':''}>${nowY+i}</option>`).join('');
+      els.monthSel.innerHTML = Array.from({length:12},(_,i)=>i+1).map(v=>`<option ${v===m?'selected':''}>${v}</option>`).join('');
+    }
 
     function renderChips(container, options, single=false, key){
       container.innerHTML='';
       options.forEach(opt=>{
         const active = single ? (state.prefs[key]===opt) : (state.prefs[key]?.includes(opt));
         const btn = document.createElement('button');
-        btn.type = 'button'; btn.className = 'pref-chip'+(active?' active':''); btn.textContent = opt;
+        btn.type='button'; btn.className='pref-chip'+(active?' active':''); btn.textContent=opt;
         btn.addEventListener('click', ()=>{
           if(single){ state.prefs[key] = opt; }
           else{ const arr = new Set(state.prefs[key]||[]); if(arr.has(opt)) arr.delete(opt); else arr.add(opt); state.prefs[key] = Array.from(arr); }
@@ -324,280 +309,214 @@
         container.appendChild(btn);
       });
     }
-    renderChips(els.pace, paceOpts, true, 'pace');
-    renderChips(els.types, typeOpts, false, 'types');
-    renderChips(els.transport, transportOpts, false, 'transport');
-    renderChips(els.dining, diningOpts, false, 'dining');
-
-    // ====== 月曆 ======
-    function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
-    function firstDayOffset(y,m){ return new Date(y, m-1, 1).getDay(); }
 
     function buildCalendar(){
-      const y = parseInt(els.yearSel.value,10); const m = parseInt(els.monthSel.value,10);
+      const y=parseInt(els.yearSel.value), m=parseInt(els.monthSel.value);
       state.year=y; state.month=m; saveState();
-      const dim = daysInMonth(y,m); const off = firstDayOffset(y,m);
-      const cells = [];
-      for(let i=0;i<off;i++) cells.push(`<div></div>`);
-      for(let d=1; d<=dim; d++){
-        const sel = (state.startDay && state.endDay && d>=state.startDay && d<=state.endDay);
-        cells.push(`<div class="day ${sel?'selected':''}" data-day="${d}">${d}</div>`);
+      const dim=new Date(y,m,0).getDate(), off=new Date(y,m-1,1).getDay();
+      let html=''; for(let i=0;i<off;i++) html+=`<div></div>`;
+      for(let d=1;d<=dim;d++){
+        const sel=(state.startDay&&state.endDay&&d>=state.startDay&&d<=state.endDay);
+        html+=`<div class="day ${sel?'selected':''}" data-day="${d}">${d}</div>`;
       }
-      els.calendar.innerHTML = cells.join('');
-      els.calendar.querySelectorAll('.day').forEach(el=>{ el.addEventListener('click', ()=>selectDay(parseInt(el.dataset.day,10))); });
-      updateRangeText();
+      els.calendar.innerHTML=html; updateRangeText();
+      els.calendar.querySelectorAll('.day').forEach(el=>el.addEventListener('click',()=>selectDay(parseInt(el.dataset.day))));
     }
 
     function selectDay(d){
-      if(!state.startDay || (state.startDay && state.endDay)){
-        state.startDay = d; state.endDay = null;
-      }else{
-        if(d < state.startDay){ state.endDay = state.startDay; state.startDay = d; }
-        else { state.endDay = d; }
-        const len = state.endDay - state.startDay + 1;
-        if(len > 30){ state.endDay = state.startDay + 29; alert('一次最多選 30 天，已自動截斷'); }
-      }
+      if(!state.startDay||(state.startDay&&state.endDay)){ state.startDay=d; state.endDay=null; }
+      else{ if(d<state.startDay){state.endDay=state.startDay;state.startDay=d;}else{state.endDay=d;} }
       saveState(); buildCalendar();
     }
 
     function updateRangeText(){
-      const y = state.year, m = state.month; const s = state.startDay, e = state.endDay; const pad=n=>String(n).padStart(2,'0');
-      els.startText.textContent = s? `${y}-${pad(m)}-${pad(s)}` : '—';
-      els.endText.textContent   = e? `${y}-${pad(m)}-${pad(e)}` : '—';
-      els.daysText.textContent  = (s&&e)? (e - s + 1) : 0;
+      const y=state.year,m=state.month,s=state.startDay,e=state.endDay; const pad=n=>String(n).padStart(2,'0');
+      els.startText.textContent=s?`${y}-${pad(m)}-${pad(s)}`:'—'; els.endText.textContent=e?`${y}-${pad(m)}-${pad(e)}`:'—'; els.daysText.textContent=(s&&e)?(e-s+1):0;
     }
 
-    // Reset 日期
-    if (els.resetDates) els.resetDates.addEventListener('click', ()=>{
-      state.startDay = null; state.endDay = null; saveState(); buildCalendar();
-    });
-
-    // ====== 預覽與提交 ======
     function currentPayload(){
-      const y = state.year, m = state.month, s = state.startDay, e = state.endDay; const pad=n=>String(n).padStart(2,'0');
-      const start_date = (s? `${y}-${pad(m)}-${pad(s)}` : '');
-      const days = (s&&e)? (e - s + 1) : 0;
+      const s=state.startDay, e=state.endDay, pad=n=>String(n).padStart(2,'0');
       return {
-        name: state.name?.trim()||'',
-        region: state.region?.trim()||'',
-        budget_twd: Number(state.budget)||0,
-        people: Math.max(1, Number(state.people)||1),
-        daily_hours: Math.min(24, Math.max(1, Number(state.dailyHours)||8)),
-        start_date, days,
-        month_span: { year: state.year, month: state.month },
+        name: state.name?.trim()||'', region: state.region?.trim()||'',
+        budget_twd: Number(state.budget)||0, people: Number(state.people)||1, daily_hours: Number(state.dailyHours)||8,
+        start_date: s?`${state.year}-${pad(state.month)}-${pad(s)}`:'', days: (s&&e)?(e-s+1):0,
         preferences: state.prefs
-      }
-    }
-
-    function renderPreview(){
-      const y = state.year, m = state.month, s = state.startDay, e = state.endDay; const pad=n=>String(n).padStart(2,'0');
-      if (els.pName) els.pName.textContent = state.name||'—';
-      if (els.pRegion) els.pRegion.textContent = state.region||'—';
-      if (els.pDate) els.pDate.textContent = (s&&e)? `${y}-${pad(m)}-${pad(s)} → ${y}-${pad(m)}-${pad(e)}` : '—';
-      if (els.pDays) els.pDays.textContent = (s&&e)? (e - s + 1) : 0;
-      if (els.pPeople) els.pPeople.textContent = state.people||1;
-      if (els.pHours) els.pHours.textContent = state.dailyHours||8;
-      if (els.jsonPreview) els.jsonPreview.textContent = JSON.stringify(currentPayload(), null, 2);
+      };
     }
 
     function syncInputs(){
-      els.tripName.value = state.name||''; els.region.value = state.region||'';
-      els.budget.value = state.budget||0; els.people.value = state.people||1; els.dailyHours.value = state.dailyHours||8;
-      els.yearSel.value = state.year; els.monthSel.value = state.month; renderPreview();
+      els.tripName.value=state.name; els.region.value=state.region; els.budget.value=state.budget;
+      els.people.value=state.people; els.dailyHours.value=state.dailyHours; els.yearSel.value=state.year; els.monthSel.value=state.month;
+      renderPreview();
     }
 
-    // 金額調整（支援按鈕不存在時忽略）
-    els.budget.addEventListener('input',   ()=>{ state.budget=els.budget.value; saveState(); });
-    els.budget.addEventListener('change',  normalizeBudget);
-    if (els.budgetInc) els.budgetInc.addEventListener('click', ()=>adjustBudget(1000));
-    if (els.budgetDec) els.budgetDec.addEventListener('click', ()=>adjustBudget(-1000));
-    function normalizeBudget(){
-      let v = parseInt(els.budget.value||0,10); if (isNaN(v)) v = 0; v = Math.round(v/1000)*1000; v = Math.max(0, v);
-      els.budget.value = v; state.budget = v; saveState();
-    }
-    function adjustBudget(delta){
-      let v = parseInt(els.budget.value || state.budget || 0, 10); if (isNaN(v)) v = 0; v = Math.max(0, v + delta); v = Math.round(v/1000)*1000;
-      els.budget.value = v; state.budget = v; saveState();
+    function renderPreview(){
+      if(els.jsonPreview) els.jsonPreview.textContent = JSON.stringify(currentPayload(), null, 2);
+      const p = currentPayload();
+      if(els.pName) els.pName.textContent = p.name || '—';
+      if(els.pRegion) els.pRegion.textContent = p.region || '—';
+      if(els.pDate) els.pDate.textContent = p.start_date || '—';
+      if(els.pDays) els.pDays.textContent = p.days;
+      if(els.pPeople) els.pPeople.textContent = p.people;
+      if(els.pHours) els.pHours.textContent = p.daily_hours;
     }
 
-    els.tripName.addEventListener('input', ()=>{ state.name=els.tripName.value; saveState(); });
-    els.region.addEventListener('input',   ()=>{ state.region=els.region.value; saveState(); });
-    els.people.addEventListener('input',   ()=>{ state.people=els.people.value; saveState(); });
-    els.dailyHours.addEventListener('input',()=>{ state.dailyHours=els.dailyHours.value; saveState(); });
-    els.yearSel.addEventListener('change', buildCalendar);
-    els.monthSel.addEventListener('change', buildCalendar);
+    // ====== 4. 事件綁定 ======
+    const paceOpts=['悠閒','適中','緊湊'], typeOpts=['景點','美食','購物','自然','博物館','夜生活','親子','展演'];
+    const transportOpts=['步行','大眾運輸','計程車','自駕'], diningOpts=['在地小吃','米其林/評鑑','平價優先','素食友善'];
 
-    // ====== 後端：載入 Trip 列表與切換 ======
-    let currentTripId = null; // 目前選取中的 Trip（null=新建）
+    initYearMonth();
+    renderChips(els.pace,paceOpts,true,'pace'); renderChips(els.types,typeOpts,false,'types');
+    renderChips(els.transport,transportOpts,false,'transport'); renderChips(els.dining,diningOpts,false,'dining');
 
-    async function fetchJSON(url){ const r = await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+    els.budget.addEventListener('input',()=>{state.budget=els.budget.value;saveState();});
+    els.tripName.addEventListener('input',()=>{state.name=els.tripName.value;saveState();});
+    els.region.addEventListener('input',()=>{state.region=els.region.value;saveState();});
+    els.people.addEventListener('input',()=>{state.people=els.people.value;saveState();});
+    els.dailyHours.addEventListener('input',()=>{state.dailyHours=els.dailyHours.value;saveState();});
+    els.yearSel.addEventListener('change',buildCalendar); els.monthSel.addEventListener('change',buildCalendar);
+    if(els.resetDates) els.resetDates.addEventListener('click', ()=>{state.startDay=null;state.endDay=null;saveState();buildCalendar();});
 
+    // ====== 5. API 載入 ======
+    async function fetchJSON(url){const r=await fetch(url);if(!r.ok)throw new Error(r.status);return r.json();}
+    
     async function loadTripList(){
       try{
-        const list = await fetchJSON(`${API}/trips`);
-        const cur = els.tripSel.value;
-        els.tripSel.innerHTML = `<option value="new">（新建）</option>` +
-          list.map(t=>`<option value="${t.id}">${t.name || '(未命名)'}</option>`).join('');
-        if(cur!=="new" && list.some(t=>String(t.id)===cur)) els.tripSel.value = cur; else els.tripSel.value = 'new';
-      }catch(e){ console.warn('載入旅行清單失敗：', e.message); }
-      setDeleteEnabled();
+        const list=await fetchJSON(`${API}/trips`);
+        const cur=els.tripSel.value;
+        els.tripSel.innerHTML=`<option value="new">（新建）</option>`+list.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+        
+        // 保持選擇
+        if(cur!=='new' && list.some(t=>String(t.id)===cur)) els.tripSel.value = cur;
+        else els.tripSel.value = 'new';
+        
+        // 載入完清單後，確認一次按鈕狀態
+        updateButtonUI();
+      }catch(e){}
     }
 
     async function loadTripById(id){
       try{
-        const t = await fetchJSON(`${API}/trips/${id}`);
-        state.name = t.name||''; state.region=t.region||''; state.budget=t.budget_twd||0;
-        state.people=t.people||1; state.dailyHours=t.daily_hours||8;
-        if(t.start_date){ const [yy,mm,dd] = t.start_date.split('-').map(n=>parseInt(n,10)); state.year=yy; state.month=mm; state.startDay=dd; state.endDay=dd+(t.days|0)-1; }
+        const t=await fetchJSON(`${API}/trips/${id}`);
+        state.name=t.name; state.region=t.region; state.budget=t.budget_twd; state.people=t.people; state.dailyHours=t.daily_hours;
+        if(t.start_date){const [y,m,d]=t.start_date.split('-').map(Number); state.year=y; state.month=m; state.startDay=d; state.endDay=d+(t.days)-1;}
+        state.prefs = t.preferences || { pace: '適中', types: [], transport: [], dining: [] };
+        
+        // 更新 UI
+        renderChips(els.pace,paceOpts,true,'pace'); renderChips(els.types,typeOpts,false,'types');
+        renderChips(els.transport,transportOpts,false,'transport'); renderChips(els.dining,diningOpts,false,'dining');
         saveState(); syncInputs(); buildCalendar();
-        currentTripId = Number(id);
-      }catch(e){ alert('讀取行程失敗：'+e.message); }
-      setDeleteEnabled();
+        
+        // 🟢 [關鍵] 只要讀取成功，就強制更新按鈕
+        updateButtonUI(); 
+
+      }catch(e){
+        alert('讀取失敗');
+        els.tripSel.value = 'new';
+        updateButtonUI();
+      } 
     }
 
-    function resetToDefaults() {
-      state = {
-        name: '', region: '', budget: 0, people: 1, dailyHours: 8,
-        year: new Date().getFullYear(), month: new Date().getMonth() + 1,
-        startDay: null, endDay: null,
-        prefs: { pace: '適中', types: [], transport: [], dining: [] }
-      };
-      localStorage.removeItem('travel_assistant_trip_v1');
-      saveState();
-      syncInputs();
-      buildCalendar();
-      currentTripId = null;
-      setDeleteEnabled();
-    }
-
-    function setDeleteEnabled() {
-      if (!els.btnDelete) return;
-      const isNew = !els.tripSel || els.tripSel.value === 'new';
-      els.btnDelete.disabled = isNew;
-      els.btnDelete.title = isNew ? '請先選擇一個已存在的行程' : '';
-    }
-
-    // 切換現有旅行 / 新建
-    els.tripSel.addEventListener('change', ()=>{
-      if(els.tripSel.value==='new'){ resetToDefaults(); }
-      else { loadTripById(els.tripSel.value); }
+    els.tripSel.addEventListener('change',()=>{
+        if(els.tripSel.value==='new'){
+            // 重置
+            localStorage.removeItem(storeKey); 
+            state = { name: '', region: '', budget: 0, people: 1, dailyHours: 8, year: new Date().getFullYear(), month: new Date().getMonth()+1, startDay: null, endDay: null, prefs: { pace: '適中', types: [], transport: [], dining: [] } };
+            saveState(); syncInputs(); buildCalendar();
+            renderChips(els.pace,paceOpts,true,'pace'); renderChips(els.types,typeOpts,false,'types');
+            renderChips(els.transport,transportOpts,false,'transport'); renderChips(els.dining,diningOpts,false,'dining');
+            updateButtonUI();
+        }else{
+            loadTripById(els.tripSel.value);
+        }
     });
 
-    // ====== 建立/更新 ======
+    // ====== 6. 🚀 [按鈕邏輯] ======
     els.btnSubmit.addEventListener('click', async ()=>{
       const p = currentPayload();
-      if(!p.name){ alert('請輸入行程名稱'); return; }
-      if(!p.region){ alert('請輸入地區/城市'); return; }
-      if(!p.start_date || p.days<=0){ alert('請在月曆選擇有效的日期區間'); return; }
+      if(!p.name || !p.region || !p.start_date || p.days<=0){ alert('請填寫完整資訊與日期'); return; }
 
-      // 點擊後立即顯示按鈕 loading 狀態（避免在 Gemini 呼叫期間看起來沒回應）
+      // 依據下拉選單的值來決定是 New 還是 Update
       const isUpdate = (els.tripSel.value !== 'new');
-      const _oldBtnText = els.btnSubmit.textContent;
+      
       els.btnSubmit.disabled = true;
       els.btnSubmit.textContent = isUpdate ? '更新中…' : '建立中…';
 
-      // 嘗試先呼叫後端的 Gemini API（非同步），若成功會顯示回應文字
-      try{
-        // 將目前的 payload 轉成可讀的文字，作為 prompt 發給 Gemini
-        const prompt = `請根據下列行程資訊與偏好，產生詳細的行程安排，格式如下：Day0:\n地點1:xxx\n概述:\n交通方式:\n地點2:(如果有的話)....，縮排要到位${JSON.stringify(p, null, 2)}`;
-        const gemResp = await fetch(`${API}/gemini`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ prompt: prompt, model: 'gemini-2.5-flash-lite' })
-        });
-        if(gemResp.ok){
-          const gdata = await gemResp.json();
-          console.log('Gemini reply:', gdata.text);
-          // 將 Gemini 回應傳回後端，儲存為 data 資料夾下的檔案（非阻塞）
-          try{
-            const safeName = (p.name || 'trip').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 60);
-            const filename = `${safeName}_${Date.now()}`;
-            const saveResp = await fetch(`${API}/gemini/save`, {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ filename: filename, name: p.name || filename, text: gdata.text || '', format: 'json' })
-            });
-            if(saveResp.ok){
-              const s = await saveResp.json();
-              console.log('Gemini saved to server:', s.path);
-            } else {
-              console.warn('Failed to save Gemini response', saveResp.status);
-            }
-          }catch(e){ console.warn('保存 Gemini 回應到伺服器失敗', e); }
-        } else {
-          console.warn('Gemini API error', gemResp.status);
-        }
-      }catch(e){
-        console.warn('Gemini call failed', e);
-      }
+      try {
+        let finalId = null; 
 
-      // 保留一份本機草稿
-      localStorage.setItem('travel_assistant_trip_v1', JSON.stringify({
-        name:p.name, startDate:p.start_date, days:p.days, region:p.region, budget_twd:p.budget_twd,
-        people:p.people, daily_hours:p.daily_hours, plan:{}
-      }));
-
-      try{
-        let resp;
         if(isUpdate){
-          const id = els.tripSel.value;
-          resp = await fetch(`${API}/trips/${id}`, {
-            method:'PUT', headers:{'Content-Type':'application/json'},
+          // === 更新模式 ===
+          // 直接使用選單上的 ID，不依賴後端回傳
+          finalId = els.tripSel.value;
+          
+          const resp = await fetch(`${API}/trips/${finalId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-              id:Number(id), name:p.name, region:p.region, start_date:p.start_date, days:p.days,
-              budget_twd:p.budget_twd, people:p.people, daily_hours:p.daily_hours, plan:[]
+                id: Number(finalId), // 必傳
+                name: p.name, region: p.region, start_date: p.start_date, days: p.days,
+                budget_twd: p.budget_twd, people: p.people, daily_hours: p.daily_hours,
+                preferences: p.preferences,
+                plan: [] // 清空 Plan 讓 Chat 重新規劃
             })
           });
-        }else{
-          resp = await fetch(`${API}/trips`, {
-            method:'POST', headers:{'Content-Type':'application/json'},
+          if(!resp.ok) throw new Error(await resp.text());
+
+        } else {
+          // === 新建模式 ===
+          const resp = await fetch(`${API}/trips`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-              name:p.name, region:p.region, start_date:p.start_date, days:p.days,
-              budget_twd:p.budget_twd, people:p.people, daily_hours:p.daily_hours
+                name: p.name, region: p.region, start_date: p.start_date, days: p.days,
+                budget_twd: p.budget_twd, people: p.people, daily_hours: p.daily_hours,
+                preferences: p.preferences
             })
           });
+          if(!resp.ok) throw new Error(await resp.text());
+          const newTrip = await resp.json();
+          finalId = newTrip.id; // 新建的必須拿後端 ID
         }
-        if(!resp.ok){ throw new Error(await resp.text() || ('HTTP '+resp.status)); }
-        const trip = await resp.json();
-  localStorage.setItem('travel_assistant_trip_v1', JSON.stringify(trip));
-  await loadTripList();
-  els.tripSel.value = String(trip.id); currentTripId = trip.id; setDeleteEnabled();
-  // Redirect to interactive chat/planning page for this trip
-  window.location.href = `/web/chat.html?trip=${trip.id}`;
-      }catch(err){
+
+        // 清除該 ID 的舊對話 (強迫 Chat 頁面重來)
+        localStorage.removeItem(`chat_history_${finalId}`);
+
+        // 跳轉
+        console.log("跳轉 ID:", finalId);
+        window.location.href = `/web/chat.html?trip=${finalId}`;
+
+      } catch(err) {
         console.error(err);
-        alert('同步失敗：'+err.message);
-        els.btnSubmit.disabled=false; els.btnSubmit.textContent='建立行程';
+        alert('操作失敗：' + err.message);
+        els.btnSubmit.disabled=false; 
+        updateButtonUI(); // 回復按鈕狀態
       }
     });
 
-    // ====== 刪除 ======
-    if (els.btnDelete) {
-      els.btnDelete.addEventListener('click', async () => {
-        const id = els.tripSel?.value;
-        if (!id || id === 'new') return;
-        if (!confirm('確定要刪除這個行程嗎？此動作無法復原。')) return;
-        try {
-          els.btnDelete.disabled = true;
-          const resp = await fetch(`${API}/trips/${id}`, { method: 'DELETE' });
-          if (!resp.ok && resp.status !== 204) { throw new Error(await resp.text() || ('HTTP ' + resp.status)); }
-          await loadTripList();
-          els.tripSel.value = 'new';
-          resetToDefaults();
-          alert('已刪除');
-        } catch (err) {
-          console.error(err);
-          alert('刪除失敗：' + err.message);
-          setDeleteEnabled();
-        }
-      });
-    }
+    if(els.btnDelete) els.btnDelete.addEventListener('click', async()=>{
+      if(!confirm('確定刪除？'))return;
+      await fetch(`${API}/trips/${els.tripSel.value}`,{method:'DELETE'});
+      loadTripList();
+      els.tripSel.value = 'new';
+      updateButtonUI();
+    });
 
-    // ====== 啟動 ======
-    function renderPreviewOnLoad(){ syncInputs(); buildCalendar(); }
-    renderPreviewOnLoad();
+    // 1. 初始化下拉選單
+    initYearMonth(); 
+    
+    // 2. 渲染 UI 元件
+    renderChips(els.pace,paceOpts,true,'pace'); 
+    renderChips(els.types,typeOpts,false,'types');
+    renderChips(els.transport,transportOpts,false,'transport'); 
+    renderChips(els.dining,diningOpts,false,'dining');
+
+    // 3. 建立日曆 (這行最重要，沒跑這行日曆就是空的)
+    buildCalendar(); 
+
+    // 4. 載入列表與狀態
     loadTripList();
-    setDeleteEnabled();
+    updateButtonUI();
   </script>
 </body>
 </html>
