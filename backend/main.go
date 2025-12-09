@@ -282,81 +282,69 @@ func deleteTrip(c *gin.Context) {
 }
 
 // chatWithGemini 處理帶有上下文的對話
-// chatWithGemini 處理帶有上下文的對話
+// chatWithGemini 處理帶有上下文的對話 (Debug 版)
 func chatWithGemini(c *gin.Context) {
+	fmt.Println("🚀 收到對話請求...") // Debug Log
+
 	var req ChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Println("❌ JSON 解析失敗:", err)
 		c.JSON(400, gin.H{"error": "JSON 格式錯誤: " + err.Error()})
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	// 1. 建立 Client
+	// 你的 API Key (確認已填入)
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		c.JSON(500, gin.H{"error": "未設定 GEMINI_API_KEY"})
-		return
-	}
+
+	fmt.Println("🔑 使用 API Key:", apiKey[:10]+"...") // 只印前10碼確認有讀到
 
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
+		fmt.Println("❌ 無法建立 Client:", err)
 		c.JSON(500, gin.H{"error": "無法建立 Gemini Client: " + err.Error()})
 		return
 	}
 	defer client.Close()
 
-	// 2. 設定模型 (關鍵修改區)
-	model := client.GenerativeModel("gemini-2.0-flash")
-
-	// [修改 1] 設定更嚴格的 System Instruction，強制它只講人話
-	// 這裡我們明確告訴 AI：你是助手，不是資料庫，禁止輸出 JSON
-	model.SystemInstruction = genai.NewUserContent(genai.Text(
-		"你是一個專業的台灣旅遊規劃助手。請用繁體中文回答，語氣親切。" +
-			"請直接以「純文字」或「Markdown」條列式呈現行程，" +
-			"**絕對不要**輸出 JSON 格式或程式碼區塊。" +
-			"請確保回答完整，不要中斷。",
-	))
-
-	// [修改 2] 增加回應長度上限 (預設有時太短，設為 8192 確保長行程能寫完)
+	model := client.GenerativeModel("gemini-2.0-flash-lite")
+	model.SystemInstruction = genai.NewUserContent(genai.Text("你是一個專業導遊。"))
 	model.SetMaxOutputTokens(8192)
-
-	// (可選) 調整溫度，讓回答穩定一點
 	model.SetTemperature(0.7)
 
-	// 3. 建立 Chat Session 並填入歷史紀錄
 	cs := model.StartChat()
 
+	// 處理歷史紀錄
 	if len(req.History) > 0 {
+		fmt.Printf("📚 載入歷史紀錄: %d 則\n", len(req.History))
 		var chatHistory []*genai.Content
 		for _, h := range req.History {
-			// [重要] 這裡建議做一個簡單的過濾
-			// 如果歷史紀錄裡有包含 "{" 這種看起來像 JSON 的，最好不要傳給模型
-			// 或者確保前端傳來的 history 只是單純的對話文字
-
 			role := "user"
 			if h.Role == "model" || h.Role == "assistant" {
 				role = "model"
 			}
-
 			chatHistory = append(chatHistory, &genai.Content{
-				Role: role,
-				Parts: []genai.Part{
-					genai.Text(h.Text),
-				},
+				Role:  role,
+				Parts: []genai.Part{genai.Text(h.Text)},
 			})
 		}
 		cs.History = chatHistory
 	}
 
-	// 4. 發送這次的訊息
+	fmt.Println("📤 正在發送訊息給 Google...")
+
+	// 發送請求
 	res, err := cs.SendMessage(ctx, genai.Text(req.Message))
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Gemini 回應錯誤: " + err.Error()})
+		// 🛑 重點：這裡會印出真正的錯誤原因！
+		fmt.Println("❌ Gemini API 錯誤:", err)
+		c.JSON(500, gin.H{"error": "Gemini API 錯誤: " + err.Error()})
 		return
 	}
 
-	// 5. 組合回應文字
+	fmt.Println("✅ 收到 Gemini 回應！")
+
 	var responseText string
 	if len(res.Candidates) > 0 {
 		for _, part := range res.Candidates[0].Content.Parts {
@@ -366,9 +354,7 @@ func chatWithGemini(c *gin.Context) {
 		}
 	}
 
-	c.JSON(200, gin.H{
-		"reply": responseText,
-	})
+	c.JSON(200, gin.H{"reply": responseText})
 }
 
 // ====== Gemini 呼叫 (單次) ======
@@ -396,7 +382,7 @@ func callGemini(c *gin.Context) {
 	// 2. 設定模型
 	modelName := req.Model
 	if modelName == "" {
-		modelName = "gemini-2.0-flash" // 建議使用目前穩定的版本
+		modelName = "gemini-2.0-flash-lite" // 建議使用目前穩定的版本
 	}
 	model := client.GenerativeModel(modelName)
 

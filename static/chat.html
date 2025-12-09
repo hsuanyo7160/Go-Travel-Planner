@@ -1,237 +1,257 @@
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>旅遊助手 — 互動規劃</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <style>
-    :root{
-      --bg-1: #fff6f3; /* soft cream */
-      --card-bg: #ffffff;
-      --accent: #2463ff; /* blue accent */
-      --muted: #f3ece8;
-      --llm-text: #0f172a;
-      --user-text: #003826;
-    }
+  <!doctype html>
+  <html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>旅遊助手 — 互動規劃</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+      :root{
+        --bg-1: #fff6f3; /* soft cream */
+        --card-bg: #ffffff;
+        --accent: #2463ff; /* blue accent */
+        --muted: #f3ece8;
+        --llm-text: #0f172a;
+        --user-text: #003826;
+      }
 
-    html, body { height:100%; }
-    body{ background: linear-gradient(180deg,var(--bg-1),#fffaf8); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; overflow:hidden; }
+      html, body { height:100%; }
+      body{ background: linear-gradient(180deg,var(--bg-1),#fffaf8); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; overflow:hidden; }
 
-    /* Full-bleed chat card: remove side margins so the card stretches to viewport edges */
-    .chat-container{ width:100%; max-width:none; margin:0; padding:0; border-radius:0; }
-    .chat-area{ min-height:68vh; }
+      /* Full-bleed chat card: remove side margins so the card stretches to viewport edges */
+      .chat-container{ width:100%; max-width:none; margin:0; padding:0; border-radius:0; }
+      .chat-area{ min-height:68vh; }
 
-    /* Main chat pane (single column) — larger and centered left-to-right with roomy right side */
-    /* full-bleed pane: let the pane span full width, keep inner padding as gutters */
-    .llm-pane{ background: var(--card-bg); border-radius:0; padding:2rem 1.25rem 2rem 2rem; box-shadow:none; overflow:auto; max-height: calc(100vh - 180px); box-sizing:border-box; width:100%; }
+      /* Main chat pane (single column) — larger and centered left-to-right with roomy right side */
+      /* full-bleed pane: let the pane span full width, keep inner padding as gutters */
+      .llm-pane{ background: var(--card-bg); border-radius:0; padding:2rem 1.25rem 2rem 2rem; box-shadow:none; overflow:auto; max-height: calc(100vh - 180px); box-sizing:border-box; width:100%; }
 
-    /* Message bubbles */
-    .msg{ margin-bottom:1.25rem; display:flex; }
-    .bubble{ background:transparent; border-radius:14px; padding:0.9rem 1.05rem; max-width:78%; white-space:pre-wrap; word-break:break-word; line-height:1.7; font-size:1.03rem; }
-    .msg.llm{ justify-content:flex-start; }
-    .msg.llm .bubble{ background: linear-gradient(180deg,var(--card-bg),#fbfdff); color:var(--llm-text); box-shadow:0 6px 18px rgba(2,6,23,.04); }
-    .msg.user{ justify-content:flex-end; }
-    .msg.user .bubble{ background: linear-gradient(90deg,#e6fff2,#c8f2d9); color:var(--user-text); box-shadow:0 6px 18px rgba(2,6,23,.04); }
-    .msg.user .bubble{ display:inline-block; margin-left:12px; }
+      /* Message bubbles */
+      .msg{ margin-bottom:1.25rem; display:flex; }
+      .bubble{ background:transparent; border-radius:14px; padding:0.9rem 1.05rem; max-width:78%; white-space:pre-wrap; word-break:break-word; line-height:1.7; font-size:1.03rem; }
+      .msg.llm{ justify-content:flex-start; }
+      .msg.llm .bubble{ background: linear-gradient(180deg,var(--card-bg),#fbfdff); color:var(--llm-text); box-shadow:0 6px 18px rgba(2,6,23,.04); }
+      .msg.user{ justify-content:flex-end; }
+      .msg.user .bubble{ background: linear-gradient(90deg,#e6fff2,#c8f2d9); color:var(--user-text); box-shadow:0 6px 18px rgba(2,6,23,.04); }
+      .msg.user .bubble{ display:inline-block; margin-left:12px; }
 
-    /* remove extra side gutters for full-bleed; keep small padding on very wide screens if desired */
-    @media (min-width:1400px){ .llm-pane{ padding-left:4rem; padding-right:2.5rem; } }
+      /* remove extra side gutters for full-bleed; keep small padding on very wide screens if desired */
+      @media (min-width:1400px){ .llm-pane{ padding-left:4rem; padding-right:2.5rem; } }
 
-    /* Input area styling and accent button */
-    .chat-input-bar{ margin-top:1.25rem; display:flex; gap:0.75rem; align-items:center; }
-    .chat-input-bar .form-control{ border-radius:14px; padding:1rem 1rem; box-shadow:0 6px 18px rgba(2,6,23,.03) inset; }
-    .chat-input-bar .btn{ background:var(--accent); border:none; color:#fff; padding:0.7rem 0.9rem; border-radius:12px; box-shadow:0 8px 20px rgba(36,99,255,0.18); }
+      /* Input area styling and accent button */
+      .chat-input-bar{ margin-top:1.25rem; display:flex; gap:0.75rem; align-items:center; }
+      .chat-input-bar .form-control{ border-radius:14px; padding:1rem 1rem; box-shadow:0 6px 18px rgba(2,6,23,.03) inset; }
+      .chat-input-bar .btn{ background:var(--accent); border:none; color:#fff; padding:0.7rem 0.9rem; border-radius:12px; box-shadow:0 8px 20px rgba(36,99,255,0.18); }
 
-    /* small screens behavior */
-    @media (max-width:992px){ .chat-container{ max-width:95%; padding-left:16px; padding-right:16px; } .bubble{ max-width:92%; } }
-  </style>
-</head>
-<body>
-  <nav class="navbar navbar-expand-lg mb-3" style="background:linear-gradient(90deg,#ffffff,#fdebd0);">
-    <div class="container">
-      <a class="navbar-brand" href="/web/">旅遊助手</a>
-      <div class="ms-auto">
-        <button id="backBtn" class="btn btn-outline-secondary btn-sm">回列表</button>
-      </div>
-    </div>
-  </nav>
-
-  <main class="container-fluid">
-    <div class="chat-container shadow-sm rounded-3 p-3">
-      <div class="row g-0">
-        <div class="col-md-9 chat-area">
-          <div id="llmPane" class="llm-pane p-3">
-            <!-- LLM messages (left) -->
-          </div>
+      /* small screens behavior */
+      @media (max-width:992px){ .chat-container{ max-width:95%; padding-left:16px; padding-right:16px; } .bubble{ max-width:92%; } }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg mb-3" style="background:linear-gradient(90deg,#ffffff,#fdebd0);">
+      <div class="container">
+        <a class="navbar-brand" href="/web/">旅遊助手</a>
+        <div class="ms-auto">
+          <button id="backBtn" class="btn btn-outline-secondary btn-sm">回列表</button>
         </div>
-        <!-- right column removed: user messages will appear inside the main llmPane as right-aligned bubbles -->
       </div>
+    </nav>
 
-      <div class="chat-input-bar mt-3 d-flex gap-2">
-        <input id="chatInput" class="form-control" placeholder="輸入你的問題或指示（例如：幫我調整行程）" />
-        <button id="sendBtn" class="btn btn-primary">💬</button>
+    <main class="container-fluid">
+      <div class="chat-container shadow-sm rounded-3 p-3">
+        <div class="row g-0">
+          <div class="col-md-9 chat-area">
+            <div id="llmPane" class="llm-pane p-3">
+              <!-- LLM messages (left) -->
+            </div>
+          </div>
+          <!-- right column removed: user messages will appear inside the main llmPane as right-aligned bubbles -->
+        </div>
+
+        <div class="chat-input-bar mt-3 d-flex gap-2">
+          <input id="chatInput" class="form-control" placeholder="輸入你的問題或指示（例如：幫我調整行程）" />
+          <button id="sendBtn" class="btn btn-primary">💬</button>
+        </div>
+        <!-- Instant display: messages revealed immediately (no typing) -->
       </div>
-      <!-- Instant display: messages revealed immediately (no typing) -->
-    </div>
-  </main>
+    </main>
 
-  <script>
-    // ====== 1. 基礎設定 ======
-    const API = '/api';
-    const params = new URLSearchParams(location.search);
-    const rawId = params.get('trip') || params.get('tripId');
-    // 如果沒有 ID，就設為 null
-    const tripId = (rawId && rawId !== 'undefined' && rawId !== 'null') ? rawId : null;
-    const STORAGE_KEY = `chat_history_${tripId}`;
-    let chatHistory = []; 
+    <script>
+      // ====== 1. 基礎設定 ======
+      const API = '/api';
+      const params = new URLSearchParams(location.search);
+      const rawId = params.get('trip') || params.get('tripId');
+      // 如果沒有 ID，就設為 null
+      const tripId = (rawId && rawId !== 'undefined' && rawId !== 'null') ? rawId : null;
+      const STORAGE_KEY = `chat_history_${tripId}`;
+      let chatHistory = []; 
 
-    document.getElementById('backBtn').addEventListener('click', ()=>{ location.href = '/web/'; });
-    const llmPane = document.getElementById('llmPane');
-    const input = document.getElementById('chatInput');
-    const sendBtn = document.getElementById('sendBtn');
-
-    // ====== 2. UI 渲染工具 ======
-    function formatMessageToHtml(text){
-      if(!text) return '';
-      let escaped = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-      escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-      escaped = escaped.replace(/### (.*)/g, '<h4>$1</h4>'); // 標題
-      return escaped.split('\n').map(line => line.match(/^\s*\*\s+(.*)$/) ? '• ' + RegExp.$1 : line).join('<br>');
-    }
-    
-    function createBubble(role, text) {
-        const el = document.createElement('div'); 
-        el.className = `msg ${role} mb-3`;
-        const bubble = document.createElement('div'); 
-        bubble.className = `bubble ${role==='user'?'user-bubble d-inline-block':''}`;
-        bubble.innerHTML = formatMessageToHtml(text);
-        el.appendChild(bubble);
-        llmPane.appendChild(el);
-        llmPane.scrollTop = llmPane.scrollHeight;
-        return bubble;
-    }
-    
-    // 用來更新泡泡內容 (例如從 "思考中" 變成 "結果")
-    function displayText(bubble, text) { 
-        bubble.innerHTML = formatMessageToHtml(text); 
-        llmPane.scrollTop = llmPane.scrollHeight; 
-    }
-    
-    function saveHistory() { 
-        if(tripId) localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory)); 
-    }
-
-    // ====== 3. 與後端溝通 (發送訊息) ======
-    async function sendMessage(text, isAutoTrigger = false) {
-        if(!text) return;
-        
-        // 只有使用者手動輸入時，才顯示使用者的泡泡
-        if (!isAutoTrigger) {
-            createBubble('user', text);
+      document.getElementById('backBtn').addEventListener('click', () => {
+        if (tripId) {
+          // from=chat 只是標記一下是從聊天頁回來
+          location.href = `/web/?trip=${encodeURIComponent(tripId)}&from=chat`;
+        } else {
+          location.href = '/web/';
         }
-        
-        chatHistory.push({ role: 'user', text: text });
+      });
+
+      const llmPane = document.getElementById('llmPane');
+      const input = document.getElementById('chatInput');
+      const sendBtn = document.getElementById('sendBtn');
+
+      // ====== 2. UI 渲染工具 ======
+      function formatMessageToHtml(text){
+        if(!text) return '';
+        let escaped = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+        escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        escaped = escaped.replace(/### (.*)/g, '<h4>$1</h4>'); // 標題
+        return escaped.split('\n').map(line => line.match(/^\s*\*\s+(.*)$/) ? '• ' + RegExp.$1 : line).join('<br>');
+      }
+      
+      function createBubble(role, text) {
+          const el = document.createElement('div'); 
+          el.className = `msg ${role} mb-3`;
+          const bubble = document.createElement('div'); 
+          bubble.className = `bubble ${role==='user'?'user-bubble d-inline-block':''}`;
+          bubble.innerHTML = formatMessageToHtml(text);
+          el.appendChild(bubble);
+          llmPane.appendChild(el);
+          llmPane.scrollTop = llmPane.scrollHeight;
+          return bubble;
+      }
+      
+      // 用來更新泡泡內容 (例如從 "思考中" 變成 "結果")
+      function displayText(bubble, text) { 
+          bubble.innerHTML = formatMessageToHtml(text); 
+          llmPane.scrollTop = llmPane.scrollHeight; 
+      }
+      
+      function saveHistory() { 
+          if(tripId) localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory)); 
+      }
+
+      // ========== 修正後的 sendMessage ==========
+      async function sendMessage(text, isAutoTrigger = false) {
+        if (!text) return;
+
+        if (!isAutoTrigger) {
+          createBubble('user', text);
+        }
+
+        chatHistory.push({ role: 'user', text });
         saveHistory();
 
-        // 顯示 Loading 泡泡
         const loadingBubble = createBubble('llm', '（正在思考與規劃...）');
 
         try {
-            const res = await fetch(`${API}/gemini/chat`, {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, history: chatHistory })
-            });
-            
-            if(!res.ok) throw new Error("API Error: " + res.status);
+          const res = await fetch(`${API}/gemini/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, history: chatHistory })
+          });
 
-            const data = await res.json();
-            const reply = data.reply || '(無回應)';
-            
-            displayText(loadingBubble, reply);
-            chatHistory.push({ role: 'model', text: reply });
-            saveHistory();
-        } catch (e) {
-            displayText(loadingBubble, '發生錯誤：' + e.message);
-            console.error(e);
-        }
-    }
-
-    // ====== 4. 初始化 (進來頁面時執行) ======
-    async function initChat() {
-        if (!tripId) {
-            createBubble('llm', "👋 你好！網址似乎缺少行程 ID。<br>請回到上一頁重新建立行程。");
-            return;
-        }
-
-        const saved = localStorage.getItem(STORAGE_KEY);
-
-        if (saved) {
-            // A. 有舊紀錄：載入並顯示
+          if (!res.ok) {
+            let errorMsg = 'API Error ' + res.status;
             try {
-                chatHistory = JSON.parse(saved);
-                if(chatHistory.length > 0) {
-                    chatHistory.forEach(msg => {
-                        // 過濾掉系統指令，只顯示正常的對話
-                        if (!msg.text.startsWith('SYSTEM_prompt:')) {
-                            createBubble(msg.role, msg.text);
-                        }
-                    });
-                    // 如果載入完沒東西 (例如只有隱藏指令)，補個歡迎詞
-                    // if(llmPane.children.length === 0) createBubble('llm', "歡迎回來！");
-                } else {
-                    // 有 key 但內容是空陣列
-                    startNewPlanning();
-                }
-            } catch(e) {
-                console.error("History parse error", e);
-                startNewPlanning();
+              const errData = await res.json();
+              if (errData && errData.error) {
+                errorMsg = errData.error;
+              }
+            } catch (_ignore) {
+              // 後端不是 JSON，就維持原本的 errorMsg
             }
-        } else {
-            // B. 無紀錄：開始新規劃
-            startNewPlanning();
+            throw new Error(errorMsg);
+          }
+
+          const data = await res.json();
+          const reply = (data && data.reply) ? data.reply : '(無回應)';
+
+          displayText(loadingBubble, reply);
+          chatHistory.push({ role: 'model', text: reply });
+          saveHistory();
+
+        } catch (e) {
+          console.error(e);
+          const msg = e && e.message ? e.message : String(e);
+          displayText(loadingBubble, '發生錯誤：' + msg);
         }
-    }
+      }
 
-    // 開始全新的規劃流程
-    async function startNewPlanning() {
-        const bubble = createBubble('llm', "正在讀取您的行程設定...");
-        
-        try {
-            // 1. 去資料庫抓使用者的設定 (index.html 存的那份)
-            const res = await fetch(`${API}/trips/${tripId}`);
-            if (res.ok) {
-                const tripData = await res.json();
-                
-                // 更新泡泡文字
-                displayText(bubble, `嗨！我看到您想去 **${tripData.region}** 玩 ${tripData.days} 天。\n我正在根據您的偏好（${tripData.preferences?.pace || '適中'}、${tripData.preferences?.types?.join('/') || '無'}）為您規劃...`);
-                
-                // 2. 組裝指令給 AI (這段使用者看不到)
-                const prompt = `SYSTEM_prompt: 請扮演專業導遊。
-這是使用者的行程需求 JSON：${JSON.stringify(tripData)}
-請根據此資訊，規劃一份詳細的${tripData.days}天行程。
-請用繁體中文，條列式呈現，包含每天的景點、餐飲建議。
-請直接開始規劃，不用解釋。`;
-                
-                // 3. 自動發送
-                await sendMessage(prompt, true);
-                
-            } else {
-                displayText(bubble, `找不到行程資料 (ID: ${tripId})。請確認是否已建立。`);
-            }
-        } catch (e) { 
-            console.error(e);
-            displayText(bubble, "連線錯誤，無法讀取行程。");
-        }
-    }
 
-    sendBtn.addEventListener('click', () => { const t=input.value.trim(); input.value=''; sendMessage(t); });
-    input.addEventListener('keypress', (e) => { if(e.key==='Enter'){ const t=input.value.trim(); input.value=''; sendMessage(t); } });
+      // ====== 4. 初始化 (進來頁面時執行) ======
+      async function initChat() {
+          if (!tripId) {
+              createBubble('llm', "👋 你好！網址似乎缺少行程 ID。<br>請回到上一頁重新建立行程。");
+              return;
+          }
 
-    // 啟動
-    document.addEventListener('DOMContentLoaded', initChat);
-  </script>
-</body>
-</html>
+          const saved = localStorage.getItem(STORAGE_KEY);
+
+          if (saved) {
+              // A. 有舊紀錄：載入並顯示
+              try {
+                  chatHistory = JSON.parse(saved);
+                  if(chatHistory.length > 0) {
+                      chatHistory.forEach(msg => {
+                          // 過濾掉系統指令，只顯示正常的對話
+                          if (!msg.text.startsWith('SYSTEM_prompt:')) {
+                              createBubble(msg.role, msg.text);
+                          }
+                      });
+                      // 如果載入完沒東西 (例如只有隱藏指令)，補個歡迎詞
+                      // if(llmPane.children.length === 0) createBubble('llm', "歡迎回來！");
+                  } else {
+                      // 有 key 但內容是空陣列
+                      startNewPlanning();
+                  }
+              } catch(e) {
+                  console.error("History parse error", e);
+                  startNewPlanning();
+              }
+          } else {
+              // B. 無紀錄：開始新規劃
+              startNewPlanning();
+          }
+      }
+
+      // 開始全新的規劃流程
+      async function startNewPlanning() {
+          const bubble = createBubble('llm', "正在讀取您的行程設定...");
+          
+          try {
+              // 1. 去資料庫抓使用者的設定 (index.html 存的那份)
+              const res = await fetch(`${API}/trips/${tripId}`);
+              if (res.ok) {
+                  const tripData = await res.json();
+                  
+                  // 更新泡泡文字
+                  displayText(bubble, `嗨！我看到您想去 **${tripData.region}** 玩 ${tripData.days} 天。\n我正在根據您的偏好（${tripData.preferences?.pace || '適中'}、${tripData.preferences?.types?.join('/') || '無'}）為您規劃...`);
+                  
+                  // 2. 組裝指令給 AI (這段使用者看不到)
+                  const prompt = `SYSTEM_prompt: 請扮演專業導遊。
+  這是使用者的行程需求 JSON：${JSON.stringify(tripData)}
+  請根據此資訊，規劃一份詳細的${tripData.days}天行程。
+  請用繁體中文，條列式呈現，包含每天的景點、餐飲建議。
+  請直接開始規劃，不用解釋。`;
+                  
+                  // 3. 自動發送
+                  await sendMessage(prompt, true);
+                  
+              } else {
+                  displayText(bubble, `找不到行程資料 (ID: ${tripId})。請確認是否已建立。`);
+              }
+          } catch (e) { 
+              console.error(e);
+              displayText(bubble, "連線錯誤，無法讀取行程。");
+          }
+      }
+
+      sendBtn.addEventListener('click', () => { const t=input.value.trim(); input.value=''; sendMessage(t); });
+      input.addEventListener('keypress', (e) => { if(e.key==='Enter'){ const t=input.value.trim(); input.value=''; sendMessage(t); } });
+
+      // 啟動
+      document.addEventListener('DOMContentLoaded', initChat);
+    </script>
+  </body>
+  </html>

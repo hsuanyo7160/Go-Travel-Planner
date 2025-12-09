@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
+  <link rel="preload" as="image" href="Source_img/image1.jpg">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>旅遊助手｜行程建立精靈</title>
@@ -16,6 +17,10 @@
       --muted:#6b7280;    /* 次要文字（灰） */
       --border:#e5e7eb;   /* 邊框淺灰 */
       --accent:#2563eb;   /* 主色（藍） */
+    }
+
+    main.container {
+      scroll-margin-top: 100px; /* 自己調整，80px 左右試試 */
     }
 
     /* 基本色與容器 */
@@ -213,7 +218,7 @@
       if(btn){
         btn.addEventListener('click', function(){
           const main = document.querySelector('main.container');
-          if(main) main.scrollIntoView({behavior:'smooth'});
+          if (main) {main.scrollIntoView({ behavior: 'smooth' });}
         });
       }
       
@@ -247,14 +252,31 @@
     // ====== 1. 設定 ======
     const storeKey = 'travel_assistant_trip_setup_v1';
     const API = "/api";
-    
+
+    // 讀取網址參數（從 chat.html 回來時會帶 trip / from）
+    const urlParams = new URLSearchParams(location.search);
+    const initialTripId = urlParams.get('trip') || urlParams.get('tripId');
+    const fromChat = urlParams.get('from') === 'chat';
     // 狀態初始化
-    let state = tryLoadState() || {
-      name: '', region: '', budget: 0, people: 1, dailyHours: 8,
-      year: new Date().getFullYear(), month: new Date().getMonth()+1,
-      startDay: null, endDay: null,
-      prefs: { pace: '適中', types: [], transport: [], dining: [] }
-    };
+    // 做一個「完全空白」的初始狀態
+    function makeEmptyState() {
+      const now = new Date();
+      return {
+        name: '',
+        region: '',
+        budget: 0,
+        people: 1,
+        dailyHours: 8,
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        startDay: null,
+        endDay: null,
+        // ✅ 這裡 pace 不要預設 "適中"，一律空字串
+        prefs: { pace: '', types: [], transport: [], dining: [] }
+      };
+    }
+
+    let state = makeEmptyState();
 
     function tryLoadState(){ try{ return JSON.parse(localStorage.getItem(storeKey)||''); }catch{ return null; } }
     function saveState(){ localStorage.setItem(storeKey, JSON.stringify(state)); renderPreview(); }
@@ -382,18 +404,26 @@
     
     async function loadTripList(){
       try{
-        const list=await fetchJSON(`${API}/trips`);
-        const cur=els.tripSel.value;
-        els.tripSel.innerHTML=`<option value="new">（新建）</option>`+list.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
-        
-        // 保持選擇
-        if(cur!=='new' && list.some(t=>String(t.id)===cur)) els.tripSel.value = cur;
-        else els.tripSel.value = 'new';
-        
-        // 載入完清單後，確認一次按鈕狀態
+        const list = await fetchJSON(`${API}/trips`);
+
+        els.tripSel.innerHTML = 
+          `<option value="new">（新建）</option>` +
+          list.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+        // 如果網址有帶 trip（從 chat 回來）
+        if (initialTripId && list.some(t => String(t.id) === initialTripId)) {
+          els.tripSel.value = initialTripId;
+          await loadTripById(initialTripId);   // 直接載入那筆行程
+        } else {
+          els.tripSel.value = 'new';
+        }
+
         updateButtonUI();
-      }catch(e){}
+      } catch(e) {
+        console.error(e);
+      }
     }
+
 
     async function loadTripById(id){
       try{
@@ -514,9 +544,19 @@
     // 3. 建立日曆 (這行最重要，沒跑這行日曆就是空的)
     buildCalendar(); 
 
-    // 4. 載入列表與狀態
-    loadTripList();
+    // 4. 載入列表與狀態，載完再依情況捲動
+  (async () => {
+    await loadTripList();   // 這裡會根據 initialTripId 決定 new or loadTripById
     updateButtonUI();
+
+    // 如果是從 chat 回來，就自動捲到 main（或 Step1 card）
+    if (fromChat) {
+      const main = document.querySelector('main.container');
+      if (main) {
+        main.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  })();
   </script>
 </body>
 </html>
