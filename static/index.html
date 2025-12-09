@@ -271,8 +271,7 @@
         month: now.getMonth() + 1,
         startDay: null,
         endDay: null,
-        // ✅ 這裡 pace 不要預設 "適中"，一律空字串
-        prefs: { pace: '', types: [], transport: [], dining: [] }
+        prefs: { pace: '適中', types: [], transport: [], dining: [] }
       };
     }
 
@@ -333,16 +332,38 @@
     }
 
     function buildCalendar(){
-      const y=parseInt(els.yearSel.value), m=parseInt(els.monthSel.value);
-      state.year=y; state.month=m; saveState();
-      const dim=new Date(y,m,0).getDate(), off=new Date(y,m-1,1).getDay();
-      let html=''; for(let i=0;i<off;i++) html+=`<div></div>`;
-      for(let d=1;d<=dim;d++){
-        const sel=(state.startDay&&state.endDay&&d>=state.startDay&&d<=state.endDay);
-        html+=`<div class="day ${sel?'selected':''}" data-day="${d}">${d}</div>`;
+      const y = parseInt(els.yearSel.value);
+      const m = parseInt(els.monthSel.value);
+      state.year = y;
+      state.month = m;
+      saveState();
+
+      const dim = new Date(y, m, 0).getDate();
+      const off = new Date(y, m - 1, 1).getDay();
+
+      let html = '';
+      for (let i = 0; i < off; i++) html += `<div></div>`;
+
+      for (let d = 1; d <= dim; d++) {
+        let sel = false;
+
+        if (state.startDay && !state.endDay) {
+          // ✅ 只有選到起始日的時候：讓 startDay 那一天先亮起來
+          sel = (d === state.startDay);
+        } else if (state.startDay && state.endDay) {
+          // ✅ start & end 都選了：整段區間亮
+          sel = (d >= state.startDay && d <= state.endDay);
+        }
+
+        html += `<div class="day ${sel ? 'selected' : ''}" data-day="${d}">${d}</div>`;
       }
-      els.calendar.innerHTML=html; updateRangeText();
-      els.calendar.querySelectorAll('.day').forEach(el=>el.addEventListener('click',()=>selectDay(parseInt(el.dataset.day))));
+
+      els.calendar.innerHTML = html;
+      updateRangeText();
+
+      els.calendar.querySelectorAll('.day').forEach(el => {
+        el.addEventListener('click', () => selectDay(parseInt(el.dataset.day)));
+      });
     }
 
     function selectDay(d){
@@ -352,9 +373,32 @@
     }
 
     function updateRangeText(){
-      const y=state.year,m=state.month,s=state.startDay,e=state.endDay; const pad=n=>String(n).padStart(2,'0');
-      els.startText.textContent=s?`${y}-${pad(m)}-${pad(s)}`:'—'; els.endText.textContent=e?`${y}-${pad(m)}-${pad(e)}`:'—'; els.daysText.textContent=(s&&e)?(e-s+1):0;
+      const y = state.year;
+      const m = state.month;
+      const s = state.startDay;
+      const e = state.endDay;
+      const pad = n => String(n).padStart(2, '0');
+
+      els.startText.textContent = s ? `${y}-${pad(m)}-${pad(s)}` : '—';
+
+      // ✅ 如果只有選 start，就先把 end 顯示同一天（或你要保持 "—" 也可以）
+      if (e) {
+        els.endText.textContent = `${y}-${pad(m)}-${pad(e)}`;
+      } else if (s) {
+        els.endText.textContent = `${y}-${pad(m)}-${pad(s)}`; // 只選起點時先當作 1 天
+      } else {
+        els.endText.textContent = '—';
+      }
+
+      let days = 0;
+      if (s && e) {
+        days = e - s + 1;
+      } else if (s && !e) {
+        days = 1; // ✅ 只選起始日先算 1 天
+      }
+      els.daysText.textContent = days;
     }
+
 
     function currentPayload(){
       const s=state.startDay, e=state.endDay, pad=n=>String(n).padStart(2,'0');
