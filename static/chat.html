@@ -56,6 +56,15 @@
       .attraction-item .images img{ width:100%; height:300px; object-fit:cover; border-radius:8px; display:block; }
       .attraction .meta{ flex:1 1 auto; color:var(--llm-text); font-size:0.98rem; line-height:1.55; }
       .img-link code{ display:inline-block; margin-left:8px; font-family:monospace; font-size:0.82rem; color:#4b5563; }
+      /* session/time words (上午/下午/午餐/晚餐/晚上/中午/傍晚/早上) */
+      .session-title{ display:block; font-size:1.18rem !important; font-weight:800 !important; color:#000000 !important; margin:0.6rem 0 0.25rem; letter-spacing:0.2px; }
+      /* ensure headings inside bubbles keep prominence */
+      .bubble .session-title{ font-size:1.18rem !important; font-weight:600 !important; color:#030303 !important; }
+      .session-title + br {display: none;}
+      .session-day{ display:block; font-size:1.5rem !important; font-weight:800 !important; color:#000000 !important; margin:0.6rem 0 0.25rem; letter-spacing:0.2px; }
+      /* ensure headings inside bubbles keep prominence */
+      .bubble .session-day{ font-size:1.5rem !important; font-weight:800 !important; color:#030303 !important; }
+      .session-day + br {display: none;}
     </style>
   </head>
   <body>
@@ -92,11 +101,10 @@
       const API = '/api';
       // Toggle for testing: when true, frontend will use local images under /web/Source_img
       // instead of calling the Unsplash API. Set to false to use Unsplash via backend.
-      const USE_LOCAL_IMAGES = false;
+      const USE_LOCAL_IMAGES = true;
 
       const params = new URLSearchParams(location.search);
       const rawId = params.get('trip') || params.get('tripId');
-      // 如果沒有 ID，就設為 null
       const tripId = (rawId && rawId !== 'undefined' && rawId !== 'null') ? rawId : null;
       const STORAGE_KEY = `chat_history_${tripId}`;
       let chatHistory = []; 
@@ -132,8 +140,20 @@
           const plainLine = ln.replace(/<[^>]+>/g, '').trim();
           // remove leading bullets/numbers (e.g. "• ", "1.") to help matching
           const normalized = plainLine.replace(/^[\s\u2022\-\d\.\)]+/, '').trim();
+          const normalized_time = plainLine.replace(/^[\s\u2022\-\*\d\.\)]+/, '').trim();
           // debug: log the normalized line so we can inspect what the model returned
           console.debug('plainLine/normalized:', JSON.stringify(plainLine), '=>', JSON.stringify(normalized));
+          const timeMatch = normalized_time.match(/^(上午|下午|午餐|晚餐|晚上|中午|傍晚|清晨|早上)\s*[\(（]/);
+          const dayMatch = normalized_time.match(/^(第[一二三四五六七八九十\d]+天|Day\s*\d+)/i);
+          if (timeMatch) {
+            parts.push(`<div class="session-title">${escapeHtml(normalized_time)}</div>`);
+            continue;
+          }
+          if (dayMatch) {
+            parts.push(`<div class="session-day">${escapeHtml(normalized_time)}</div>`);
+            continue;
+          }
+
           // detect attraction lines like "景點：台北車站、士林夜市" even if wrapped in tags or prefixed
           const attrMatch = normalized.match(/(?:景點|地點|Attraction)[:：]\s*(.+)$/i);
           if (attrMatch) {
@@ -180,7 +200,6 @@
             parts.push(hasHtml ? ln : escapeHtml(line));
           }
         }
-
         return parts.join('<br>');
       }
       
