@@ -20,6 +20,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 
 	//"google.golang.org/genai"
 	"github.com/google/generative-ai-go/genai"
@@ -107,6 +108,9 @@ func initMongo() {
 
 // ========== 主程式 ==========
 func main() {
+	// 載入 .env 檔案
+	godotenv.Load()
+
 	// 連線 MongoDB
 	initMongo()
 
@@ -303,7 +307,7 @@ func chatWithGemini(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	// 你的 API Key (確認已填入)
-	apiKey := os.Getenv("GEMINI_API_KEY")
+	apiKey := os.Getenv("GOOGLE_API_KEY")
 
 	fmt.Println("🔑 使用 API Key:", apiKey[:10]+"...") // 只印前10碼確認有讀到
 
@@ -378,7 +382,7 @@ func callGemini(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	// 1. 建立 Client (同樣建議改用環境變數)
-	apiKey := os.Getenv("GEMINI_API_KEY")
+	apiKey := os.Getenv("GOOGLE_API_KEY")
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Client error: " + err.Error()})

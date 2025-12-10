@@ -24,6 +24,10 @@ Go-Travel-Planner/
 bash status.sh
 ```
 
+## 注意事項
+
+自己的 api key 開在 /backend/.env 下就可以用了
+
 ## 快速開始
 
 ### 方法一：使用啟動腳本（推薦）
