@@ -90,6 +90,10 @@
     <script>
       // ====== 1. 基礎設定 ======
       const API = '/api';
+      // Toggle for testing: when true, frontend will use local images under /web/Source_img
+      // instead of calling the Unsplash API. Set to false to use Unsplash via backend.
+      const USE_LOCAL_IMAGES = false;
+
       const params = new URLSearchParams(location.search);
       const rawId = params.get('trip') || params.get('tripId');
       // 如果沒有 ID，就設為 null
@@ -212,6 +216,21 @@
           const q = decodeURIComponent(img.getAttribute('data-query') || '');
           if(!q) return;
           try{
+            if (USE_LOCAL_IMAGES) {
+              const local = "Source_img/image1.jpg";
+              if (local) {
+                img.src = local;
+                const parent = img.closest('.attraction-item');
+                if(parent){
+                  const a = parent.querySelector('a.view-img');
+                  const code = parent.querySelector('code[data-url]');
+                  if(a){ a.href = local; a.target = '_blank'; a.rel='noopener noreferrer'; }
+                  if(code){ code.textContent = local; }
+                }
+                return;
+              }
+            }
+
             const res = await fetch(`/api/unsplash?query=${encodeURIComponent(q)}`);
             if(!res.ok) return;
             const j = await res.json();
