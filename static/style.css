@@ -110,3 +110,12 @@ main.container { margin-top: 3rem; }
 
 /* JSON preview 背景更柔和 */
 .autumn-section pre{ background: rgba(18,12,8,0.03); border: 1px solid rgba(18,12,8,0.04); padding: .75rem; }
+
+
+/* 停用的日期樣式 */
+.day.disabled {
+  background: #e5e5e5;
+  color: #888;
+  border-color: #d1d1d1;
+  pointer-events: none;
+}

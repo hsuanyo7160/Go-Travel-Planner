@@ -341,28 +341,48 @@
       const dim = new Date(y, m, 0).getDate();
       const off = new Date(y, m - 1, 1).getDay();
 
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
       let html = '';
       for (let i = 0; i < off; i++) html += `<div></div>`;
 
       for (let d = 1; d <= dim; d++) {
-        let sel = false;
 
+        // 這一天的真實日期
+        const thisDate = new Date(y, m - 1, d);
+        thisDate.setHours(0,0,0,0);
+
+        // 是否為過期日期
+        const isPast = thisDate < today;
+
+        // 是否被選中
+        let sel = false;
         if (state.startDay && !state.endDay) {
-          // ✅ 只有選到起始日的時候：讓 startDay 那一天先亮起來
           sel = (d === state.startDay);
         } else if (state.startDay && state.endDay) {
-          // ✅ start & end 都選了：整段區間亮
           sel = (d >= state.startDay && d <= state.endDay);
         }
 
-        html += `<div class="day ${sel ? 'selected' : ''}" data-day="${d}">${d}</div>`;
+        html += `
+          <div class="day 
+            ${sel ? 'selected' : ''} 
+            ${isPast ? 'disabled' : ''}
+          " 
+          data-day="${isPast ? '' : d}"
+          >
+            ${d}
+          </div>`;
       }
 
       els.calendar.innerHTML = html;
       updateRangeText();
 
-      els.calendar.querySelectorAll('.day').forEach(el => {
-        el.addEventListener('click', () => selectDay(parseInt(el.dataset.day)));
+      // 過期日期不能點
+      els.calendar.querySelectorAll('.day:not(.disabled)').forEach(el => {
+        el.addEventListener('click', () => {
+          selectDay(parseInt(el.dataset.day));
+        });
       });
     }
 
