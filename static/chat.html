@@ -46,6 +46,16 @@
 
       /* small screens behavior */
       @media (max-width:992px){ .chat-container{ max-width:95%; padding-left:16px; padding-right:16px; } .bubble{ max-width:92%; } }
+
+      /* Attraction card layout: numbered title, then image + description */
+      .attraction{ margin:0.6rem 0; }
+      .attraction-item{ margin-bottom:0.75rem; border-radius:10px; padding:0.6rem; background:linear-gradient(180deg,#ffffff,#fbfbfd); box-shadow:0 6px 18px rgba(2,6,23,.03); }
+      .attraction-title{ font-weight:600; margin-bottom:0.45rem; color:var(--accent); }
+      .attraction-body{ display:flex; gap:0.75rem; align-items:flex-start; }
+      .attraction-item .images{ flex:0 0 400px; max-width:400px; }
+      .attraction-item .images img{ width:100%; height:300px; object-fit:cover; border-radius:8px; display:block; }
+      .attraction .meta{ flex:1 1 auto; color:var(--llm-text); font-size:0.98rem; line-height:1.55; }
+      .img-link code{ display:inline-block; margin-left:8px; font-family:monospace; font-size:0.82rem; color:#4b5563; }
     </style>
   </head>
   <body>
@@ -61,7 +71,7 @@
     <main class="container-fluid">
       <div class="chat-container shadow-sm rounded-3 p-3">
         <div class="row g-0">
-          <div class="col-md-9 chat-area">
+          <div class="col-12 chat-area">
             <div id="llmPane" class="llm-pane p-3">
               <!-- LLM messages (left) -->
             </div>
@@ -101,12 +111,73 @@
       const sendBtn = document.getElementById('sendBtn');
 
       // ====== 2. UI 渲染工具 ======
+      function escapeHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
       function formatMessageToHtml(text){
         if(!text) return '';
-        let escaped = String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-        escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        escaped = escaped.replace(/### (.*)/g, '<h4>$1</h4>'); // 標題
-        return escaped.split('\n').map(line => line.match(/^\s*\*\s+(.*)$/) ? '• ' + RegExp.$1 : line).join('<br>');
+        // basic escapes and markdown-like transforms
+        let raw = String(text);
+        raw = raw.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        raw = raw.replace(/### (.*)/g, '<h4>$1</h4>'); // 標題
+
+        const lines = raw.split('\n');
+        const parts = [];
+        for (let ln of lines) {
+          const line = ln.trim();
+          // remove HTML tags for matching purposes (backend may already include <strong>...)
+          const plainLine = ln.replace(/<[^>]+>/g, '').trim();
+          // remove leading bullets/numbers (e.g. "• ", "1.") to help matching
+          const normalized = plainLine.replace(/^[\s\u2022\-\d\.\)]+/, '').trim();
+          // debug: log the normalized line so we can inspect what the model returned
+          console.debug('plainLine/normalized:', JSON.stringify(plainLine), '=>', JSON.stringify(normalized));
+          // detect attraction lines like "景點：台北車站、士林夜市" even if wrapped in tags or prefixed
+          const attrMatch = normalized.match(/(?:景點|地點|Attraction)[:：]\s*(.+)$/i);
+          if (attrMatch) {
+              const namesStr = attrMatch[1];
+              // keep parenthetical content together: remove internal delimiters/newlines inside parentheses
+              let cleaned = namesStr.replace(/（[^）]*）/g, m => m.replace(/[、,;；\/\n]+/g, ' '));
+              cleaned = cleaned.replace(/\([^\)]*\)/g, m => m.replace(/[、,;；\/\n]+/g, ' '));
+              cleaned = cleaned.replace(/\s+/g,' ').trim();
+              const names = cleaned.split(/[、,;；\/\n]+/).map(s=>s.trim()).filter(Boolean);
+            const itemsHtml = names.map((n, idx) => {
+              // sanitize name for query: remove parenthetical, alternatives, slashes
+              let qname = String(n).replace(/\s*\(.*$/,'').replace(/\s*（.*$/,'').replace(/\s*或.*$/,'').replace(/\s*\/.*$/,'').trim();
+              if (!qname) qname = n;
+              const q = encodeURIComponent(qname.replace(/\s+/g,' '));
+              // placeholder 1x1 gif until backend returns an Unsplash URL
+              const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+              const titleHtml = escapeHtml(n);
+              const descHtml = escapeHtml(namesStr);
+              return `<div class="attraction-item">`+
+                       `<div class="attraction-title">${idx+1}. ${titleHtml}</div>`+
+                       `<div class="attraction-body">`+
+                         `<div class="images"><img data-query="${q}" src="${placeholder}" alt="${escapeHtml(n)}" loading="lazy"></div>`+
+                        `<div class="meta"><div class="desc">${descHtml}</div>`+
+                          `<div class="img-link" style="margin-top:8px;font-size:0.85rem;color:#6b6b6b;">`+
+                            `<a class="view-img" href="#" data-query="${q}">查看圖片</a>`+
+                            `<code data-url></code>`+
+                          `</div>`+
+                        `</div>`+
+                       `</div>`+
+                     `</div>`;
+            }).join('');
+            console.log('attraction detected:', names, 'generated srcs:', names.map(n=>`https://source.unsplash.com/800x600/?${encodeURIComponent(n.replace(/\s+/g,' '))}`));
+            parts.push(itemsHtml);
+            continue;
+          }
+
+          // bullet conversion for lines starting with '* '
+          const bullet = plainLine.match(/^\*\s+(.*)$/);
+          const hasHtml = /<[^>]+>/.test(ln);
+          if (bullet) {
+            const content = bullet[1];
+            parts.push('• ' + (hasHtml ? ln.replace(/^[\s\S]*?\*\s*/,'') : escapeHtml(content)));
+          } else {
+            parts.push(hasHtml ? ln : escapeHtml(line));
+          }
+        }
+
+        return parts.join('<br>');
       }
       
       function createBubble(role, text) {
@@ -118,6 +189,8 @@
           el.appendChild(bubble);
           llmPane.appendChild(el);
           llmPane.scrollTop = llmPane.scrollHeight;
+          // after inserting, try to load unsplash images for any placeholders
+          try { loadUnsplashImages(el); } catch(e){ /* ignore */ }
           return bubble;
       }
       
@@ -125,10 +198,37 @@
       function displayText(bubble, text) { 
           bubble.innerHTML = formatMessageToHtml(text); 
           llmPane.scrollTop = llmPane.scrollHeight; 
+          try { loadUnsplashImages(bubble.parentElement); } catch(e) { console.error(e); }
       }
       
       function saveHistory() { 
           if(tripId) localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory)); 
+      }
+
+      // Fetch Unsplash URL from backend and update <img> placeholders
+      async function loadUnsplashImages(container){
+        const imgs = Array.from(container.querySelectorAll('img[data-query]'));
+        const tasks = imgs.map(async (img) => {
+          const q = decodeURIComponent(img.getAttribute('data-query') || '');
+          if(!q) return;
+          try{
+            const res = await fetch(`/api/unsplash?query=${encodeURIComponent(q)}`);
+            if(!res.ok) return;
+            const j = await res.json();
+            if(j && j.url){
+              img.src = j.url;
+              // update link and code text
+              const parent = img.closest('.attraction-item');
+              if(parent){
+                const a = parent.querySelector('a.view-img');
+                const code = parent.querySelector('code[data-url]');
+                if(a){ a.href = j.url; a.target = '_blank'; a.rel='noopener noreferrer'; }
+                if(code){ code.textContent = j.url; }
+              }
+            }
+          }catch(e){ console.error('unsplash fetch error', e); }
+        });
+        await Promise.all(tasks);
       }
 
       // ========== 修正後的 sendMessage ==========
@@ -216,36 +316,33 @@
       }
 
       // 開始全新的規劃流程
-      async function startNewPlanning() {
+        async function startNewPlanning() {
           const bubble = createBubble('llm', "正在讀取您的行程設定...");
           
           try {
-              // 1. 去資料庫抓使用者的設定 (index.html 存的那份)
-              const res = await fetch(`${API}/trips/${tripId}`);
-              if (res.ok) {
-                  const tripData = await res.json();
+            // 1. 去資料庫抓使用者的設定 (index.html 存的那份)
+            const res = await fetch(`${API}/trips/${tripId}`);
+            if (res.ok) {
+              const tripData = await res.json();
                   
-                  // 更新泡泡文字
-                  displayText(bubble, `嗨！我看到您想去 **${tripData.region}** 玩 ${tripData.days} 天。\n我正在根據您的偏好（${tripData.preferences?.pace || '適中'}、${tripData.preferences?.types?.join('/') || '無'}）為您規劃...`);
+              // 更新泡泡文字
+              displayText(bubble, `嗨！我看到您想去 **${tripData.region}** 玩 ${tripData.days} 天。\n我正在根據您的偏好（${tripData.preferences?.pace || '適中'}、${tripData.preferences?.types?.join('/') || '無'}）為您規劃...`);
                   
-                  // 2. 組裝指令給 AI (這段使用者看不到)
-                  const prompt = `SYSTEM_prompt: 請扮演專業導遊。
-  這是使用者的行程需求 JSON：${JSON.stringify(tripData)}
-  請根據此資訊，規劃一份詳細的${tripData.days}天行程。
-  請用繁體中文，條列式呈現，包含每天的景點、餐飲建議。
-  請直接開始規劃，不用解釋。`;
+              // 2. 組裝指令給 AI (這段使用者看不到)
+              const prompt = `SYSTEM_prompt: 請扮演專業導遊。\n  這是使用者的行程需求 JSON：${JSON.stringify(tripData)}\n  請根據此資訊，規劃一份詳細的${tripData.days}天行程。\n  請用繁體中文，條列式呈現，包含每天的景點、餐飲建議，景點欄位要是英文名\n  請直接開始規劃，不用解釋.`;
+              
                   
-                  // 3. 自動發送
-                  await sendMessage(prompt, true);
+              // 3. 自動發送
+              await sendMessage(prompt, true);
                   
-              } else {
-                  displayText(bubble, `找不到行程資料 (ID: ${tripId})。請確認是否已建立。`);
-              }
+            } else {
+              displayText(bubble, `找不到行程資料 (ID: ${tripId})。請確認是否已建立。`);
+            }
           } catch (e) { 
-              console.error(e);
-              displayText(bubble, "連線錯誤，無法讀取行程。");
+            console.error(e);
+            displayText(bubble, "連線錯誤，無法讀取行程。");
           }
-      }
+        }
 
       sendBtn.addEventListener('click', () => { const t=input.value.trim(); input.value=''; sendMessage(t); });
       input.addEventListener('keypress', (e) => { if(e.key==='Enter'){ const t=input.value.trim(); input.value=''; sendMessage(t); } });
