@@ -34,19 +34,21 @@ import (
 
 // ========== 資料模型 ==========
 type Trip struct {
-	MongoID     primitive.ObjectID `bson:"_id,omitempty" json:"-"`
-	ID          int                `json:"id"`
-	Name        string             `json:"name"`
-	Region      string             `json:"region"`
-	StartDate   string             `json:"start_date"`
-	Days        int                `json:"days"`
-	BudgetTWD   int                `json:"budget_twd"`
-	People      int                `json:"people"`
-	DailyHours  int                `json:"daily_hours"`
-	Preferences Preferences        `json:"preferences"`
-	Plan        []Day              `json:"plan"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	MongoID primitive.ObjectID `bson:"_id,omitempty" json:"-"`
+
+	// ▼▼▼ 修改這裡：加上 bson:"..." 以確保資料庫欄位名稱統一 ▼▼▼
+	ID          int         `json:"id" bson:"id"`
+	Name        string      `json:"name" bson:"name"`
+	Region      string      `json:"region" bson:"region"`
+	StartDate   string      `json:"start_date" bson:"start_date"`
+	Days        int         `json:"days" bson:"days"`
+	BudgetTWD   int         `json:"budget_twd" bson:"budget_twd"`
+	People      int         `json:"people" bson:"people"`
+	DailyHours  int         `json:"daily_hours" bson:"daily_hours"`
+	Preferences Preferences `json:"preferences" bson:"preferences"`
+	Plan        []Day       `json:"plan" bson:"plan"`
+	CreatedAt   time.Time   `json:"created_at" bson:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at" bson:"updated_at"`
 }
 
 type Preferences struct {
@@ -242,34 +244,64 @@ func updateTrip(c *gin.Context) {
 		return
 	}
 
-	var updateData Trip
-	if err := c.ShouldBindJSON(&updateData); err != nil {
+	// 1. 先用 map 接收前端傳來的資料，這樣才能知道前端「到底傳了哪些欄位」
+	var rawMap map[string]interface{}
+	if err := c.ShouldBindJSON(&rawMap); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	updateData.UpdatedAt = time.Now()
-
+	// 2. 準備要更新的 bson map
 	update := bson.M{
-		"name":        updateData.Name,
-		"region":      updateData.Region,
-		"start_date":  updateData.StartDate,
-		"days":        updateData.Days,
-		"budget_twd":  updateData.BudgetTWD,
-		"people":      updateData.People,
-		"daily_hours": updateData.DailyHours,
-		"preferences": updateData.Preferences,
-		"plan":        updateData.Plan,
-		"updated_at":  updateData.UpdatedAt,
+		"updated_at": time.Now(),
 	}
 
-	_, err = tripsCollection.UpdateOne(
+	// 3. 逐一檢查欄位，有傳才更新
+	if v, ok := rawMap["name"]; ok {
+		update["name"] = v
+	}
+	if v, ok := rawMap["region"]; ok {
+		update["region"] = v
+	}
+	if v, ok := rawMap["start_date"]; ok {
+		update["start_date"] = v
+	}
+	if v, ok := rawMap["days"]; ok {
+		update["days"] = v
+	}
+	if v, ok := rawMap["budget_twd"]; ok {
+		update["budget_twd"] = v
+	}
+	if v, ok := rawMap["people"]; ok {
+		update["people"] = v
+	}
+	if v, ok := rawMap["daily_hours"]; ok {
+		update["daily_hours"] = v
+	}
+	if v, ok := rawMap["preferences"]; ok {
+		update["preferences"] = v
+	}
+
+	// ⚠️ 關鍵：只有當前端真的傳了 "plan" 欄位時，才去更新它
+	// 如果前端沒傳 (因為是微調模式)，這裡就不會把 plan 覆蓋掉
+	if v, ok := rawMap["plan"]; ok {
+		update["plan"] = v
+	}
+
+	// 4. 執行更新
+	result, err := tripsCollection.UpdateOne(
 		context.Background(),
 		bson.M{"id": id},
 		bson.M{"$set": update},
 	)
+
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	if result.MatchedCount == 0 {
+		c.JSON(404, gin.H{"error": "Trip not found"})
 		return
 	}
 
@@ -307,7 +339,7 @@ func chatWithGemini(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	// 你的 API Key (確認已填入)
-	apiKey := os.Getenv("GOOGLE_API_KEY")
+	apiKey := os.Getenv("GEMINI_API_KEY")
 
 	fmt.Println("🔑 使用 API Key:", apiKey[:10]+"...") // 只印前10碼確認有讀到
 
@@ -382,7 +414,7 @@ func callGemini(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	// 1. 建立 Client (同樣建議改用環境變數)
-	apiKey := os.Getenv("GOOGLE_API_KEY")
+	apiKey := os.Getenv("GEMINI_API_KEY")
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Client error: " + err.Error()})

@@ -71,8 +71,11 @@
     <nav class="navbar navbar-expand-lg mb-3" style="background:linear-gradient(90deg,#ffffff,#fdebd0);">
       <div class="container">
         <a class="navbar-brand" href="/web/">旅遊助手</a>
-        <div class="ms-auto">
+        <div class="ms-auto d-flex gap-2 align-items-center">
           <button id="backBtn" class="btn btn-outline-secondary btn-sm">回列表</button>
+          <button id="btnCheckFlight" class="btn btn-primary btn-sm d-flex align-items-center gap-1">
+            <span>✈️</span> 比價
+          </button>
         </div>
       </div>
     </nav>
@@ -80,6 +83,7 @@
     <main class="container-fluid">
       <div class="chat-container shadow-sm rounded-3 p-3">
         <div class="row g-0">
+
           <div class="col-12 chat-area">
             <div id="llmPane" class="llm-pane p-3">
               <!-- LLM messages (left) -->
@@ -101,13 +105,14 @@
       const API = '/api';
       // Toggle for testing: when true, frontend will use local images under /web/Source_img
       // instead of calling the Unsplash API. Set to false to use Unsplash via backend.
-      const USE_LOCAL_IMAGES = true;
+      const USE_LOCAL_IMAGES = false;
 
       const params = new URLSearchParams(location.search);
       const rawId = params.get('trip') || params.get('tripId');
       const tripId = (rawId && rawId !== 'undefined' && rawId !== 'null') ? rawId : null;
       const STORAGE_KEY = `chat_history_${tripId}`;
       let chatHistory = []; 
+      let currentTripData = null;
 
       document.getElementById('backBtn').addEventListener('click', () => {
         if (tripId) {
@@ -324,69 +329,129 @@
               return;
           }
 
-          const saved = localStorage.getItem(STORAGE_KEY);
+          // ▼▼▼ 2. 修改這裡：一進來先抓行程資料存到 Global ▼▼▼
+          try {
+              const res = await fetch(`${API}/trips/${tripId}`);
+              if (res.ok) {
+                  currentTripData = await res.json();
+                  console.log("行程資料已載入:", currentTripData);
+              } else {
+                  console.error("無法讀取行程資料");
+              }
+          } catch (e) {
+              console.error("API 連線錯誤", e);
+          }
+          // ▲▲▲ 修改結束 ▲▲▲
 
+          // 接著才處理歷史紀錄
+          const saved = localStorage.getItem(STORAGE_KEY);
           if (saved) {
-              // A. 有舊紀錄：載入並顯示
               try {
                   chatHistory = JSON.parse(saved);
                   if(chatHistory.length > 0) {
                       chatHistory.forEach(msg => {
-                          // 過濾掉系統指令，只顯示正常的對話
                           if (!msg.text.startsWith('SYSTEM_prompt:')) {
                               createBubble(msg.role, msg.text);
                           }
                       });
-                      // 如果載入完沒東西 (例如只有隱藏指令)，補個歡迎詞
-                      // if(llmPane.children.length === 0) createBubble('llm', "歡迎回來！");
                   } else {
-                      // 有 key 但內容是空陣列
                       startNewPlanning();
                   }
               } catch(e) {
-                  console.error("History parse error", e);
                   startNewPlanning();
               }
           } else {
-              // B. 無紀錄：開始新規劃
               startNewPlanning();
           }
       }
 
       // 開始全新的規劃流程
-        async function startNewPlanning() {
-          const bubble = createBubble('llm', "正在讀取您的行程設定...");
-          
-          try {
-            // 1. 去資料庫抓使用者的設定 (index.html 存的那份)
-            const res = await fetch(`${API}/trips/${tripId}`);
-            if (res.ok) {
-              const tripData = await res.json();
-                  
-              // 更新泡泡文字
-              displayText(bubble, `嗨！我看到您想去 **${tripData.region}** 玩 ${tripData.days} 天。\n我正在根據您的偏好（${tripData.preferences?.pace || '適中'}、${tripData.preferences?.types?.join('/') || '無'}）為您規劃...`);
-                  
-              // 2. 組裝指令給 AI (這段使用者看不到)
-              const prompt = `SYSTEM_prompt: 請扮演專業導遊。\n  這是使用者的行程需求 JSON：${JSON.stringify(tripData)}\n  請根據此資訊，規劃一份詳細的${tripData.days}天行程。\n  請用繁體中文，條列式呈現，包含每天的景點、餐飲建議，景點欄位要是英文名\n  請直接開始規劃，不用解釋.`;
-              
-                  
-              // 3. 自動發送
-              await sendMessage(prompt, true);
-                  
-            } else {
-              displayText(bubble, `找不到行程資料 (ID: ${tripId})。請確認是否已建立。`);
-            }
-          } catch (e) { 
-            console.error(e);
-            displayText(bubble, "連線錯誤，無法讀取行程。");
-          }
+      async function startNewPlanning() {
+        const bubble = createBubble('llm', "正在讀取您的行程設定...");
+        
+        // ▼▼▼ 直接使用 Global 變數，不用再 fetch ▼▼▼
+        if (currentTripData) {
+            // 有資料，直接開始規劃
+            const tripData = currentTripData;
+            displayText(bubble, `嗨！我看到您想去 **${tripData.region}** 玩 ${tripData.days} 天。\n我正在根據您的偏好（${tripData.preferences?.pace || '適中'}、${tripData.preferences?.types?.join('/') || '無'}）為您規劃...`);
+            const prompt = `SYSTEM_prompt: 請扮演專業導遊。\n  這是使用者的行程需求 JSON：${JSON.stringify(tripData)}\n  請根據此資訊，規劃一份詳細的${tripData.days}天行程。\n  請用繁體中文，條列式呈現，包含每天的景點、餐飲建議，景點欄位要是英文名\n  請直接開始規劃，不用解釋.`;
+            await sendMessage(prompt, true);
+        } else {
+            // 萬一 initChat 抓失敗了，這裡顯示錯誤
+            displayText(bubble, `找不到行程資料 (ID: ${tripId})。請確認後端是否正常。`);
         }
+      }
 
       sendBtn.addEventListener('click', () => { const t=input.value.trim(); input.value=''; sendMessage(t); });
       input.addEventListener('keypress', (e) => { if(e.key==='Enter'){ const t=input.value.trim(); input.value=''; sendMessage(t); } });
 
       // 啟動
       document.addEventListener('DOMContentLoaded', initChat);
+
+      // ========== 機票按鈕 (全自動 Skyscanner 版) - 最終優化版 ==========
+      const btnCheckFlight = document.getElementById('btnCheckFlight');
+      
+      if(btnCheckFlight){
+        btnCheckFlight.addEventListener('click', () => { // 這裡不用 async 了，因為沒 fetch
+            
+            // ▼▼▼ 直接檢查 Global 變數 ▼▼▼
+            if (!currentTripData) {
+                alert("行程資料尚未載入或讀取失敗，請重新整理頁面試試。");
+                return;
+            }
+            
+            const tripData = currentTripData; // 直接拿來用
+            
+            // --- 以下邏輯完全不用動 ---
+            const originCode = "TPE"; 
+
+            // 地名轉機場代碼對照
+            const cityToCode = {
+              "東京": "TYO", "大阪": "OSA", "京都": "OSA", "北海道": "SPK", "沖繩": "OKA", "福岡": "FUK",
+              "首爾": "SEL", "釜山": "PUS",
+              "曼谷": "BKK", "清邁": "CNX",
+              "新加坡": "SIN", "吉隆坡": "KUL",
+              "倫敦": "LON", "巴黎": "PAR", "紐約": "NYC", "洛杉磯": "LAX", "舊金山": "SFO",
+              "雪梨": "SYD", "墨爾本": "MEL",
+              "香港": "HKG", "澳門": "MFM"
+            };
+            
+            let destName = tripData.region || ""; 
+            let destCode = cityToCode[destName];
+
+            if (!destCode) {
+              destCode = prompt(`系統不確定「${destName}」的機場代碼。\n請輸入機場代碼 (例如 名古屋請輸入 NGO):`, "");
+              if (!destCode) return;
+            }
+
+            if (!tripData.start_date) {
+              alert("行程缺少出發日期");
+              return;
+            }
+
+            const startDateStr = tripData.start_date; 
+            const startDateObj = new Date(startDateStr);
+            const days = parseInt(tripData.days) || 5; 
+            const returnDateObj = new Date(startDateObj);
+            returnDateObj.setDate(startDateObj.getDate() + (days - 1));
+
+            const formatSkyscannerDate = (date) => {
+              let y = date.getFullYear().toString().slice(2);
+              let m = (date.getMonth() + 1).toString().padStart(2, '0');
+              let d = date.getDate().toString().padStart(2, '0');
+              return `${y}${m}${d}`;
+            };
+
+            const goDateParam = formatSkyscannerDate(startDateObj);
+            const backDateParam = formatSkyscannerDate(returnDateObj);
+
+            const url = `https://www.skyscanner.com.tw/transport/flights/${originCode}/${destCode}/${goDateParam}/${backDateParam}/?cabinclass=economy&adults=1`;
+
+            createBubble('llm', `✈️ 正在為您開啟 Skyscanner 比價視窗：\n**${originCode} ↔ ${destName}(${destCode})**\n日期：${startDateStr} ~ ${returnDateObj.toISOString().split('T')[0]}`);
+
+            window.open(url, '_blank');
+        });
+      }
     </script>
   </body>
   </html>

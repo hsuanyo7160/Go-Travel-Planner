@@ -276,6 +276,7 @@
     }
 
     let state = makeEmptyState();
+    let loadedState = null; // ▼▼▼ 新增這個變數：用來存「剛載入時的原始資料」
 
     function tryLoadState(){ try{ return JSON.parse(localStorage.getItem(storeKey)||''); }catch{ return null; } }
     function saveState(){ localStorage.setItem(storeKey, JSON.stringify(state)); renderPreview(); }
@@ -295,7 +296,50 @@
     };
 
     // ====== 3. 輔助函式 ======
+
+    // 檢查關鍵欄位是否改變 (地點、日期、天數、偏好)
+    function hasCriticalChanges(current) {
+        if (!loadedState) return true; // 如果是新建的，當然算有變
+        
+        // 比對基本欄位
+        if (current.region !== loadedState.region) return true;
+        if (current.start_date !== loadedState.start_date) return true;
+        if (current.days !== loadedState.days) return true;
+
+        // 比對偏好 (因為是物件/陣列，轉成 JSON 字串比對最快)
+        const currentPrefs = JSON.stringify(current.preferences);
+        const oldPrefs = JSON.stringify(loadedState.prefs);
+        if (currentPrefs !== oldPrefs) return true;
+
+        return false; // 都沒變
+    }
     
+    // ▼▼▼ 新增這個函式：用來徹底清空表單與狀態 ▼▼▼
+    function resetForm() {
+      // 1. 清除 LocalStorage
+      localStorage.removeItem(storeKey);
+      
+      // 2. 狀態回歸空白
+      state = makeEmptyState();
+      
+      // 3. 畫面同步
+      syncInputs();
+      buildCalendar();
+      
+      // 4. 重置所有選項 (Chip)
+      renderChips(els.pace, paceOpts, true, 'pace');
+      renderChips(els.types, typeOpts, false, 'types');
+      renderChips(els.transport, transportOpts, false, 'transport');
+      renderChips(els.dining, diningOpts, false, 'dining');
+      
+      // 5. 按鈕狀態更新
+      updateButtonUI();
+      
+      // 6. 預覽更新
+      renderPreview();
+    }
+
+
     // 🟢 [關鍵修改] 強制更新按鈕狀態的函式
     function updateButtonUI() {
         const isNew = (!els.tripSel.value || els.tripSel.value === 'new');
@@ -474,12 +518,13 @@
           `<option value="new">（新建）</option>` +
           list.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
 
-        // 如果網址有帶 trip（從 chat 回來）
+        // 邏輯修改：如果有 ID 且存在於列表，就載入；否則一律清空
         if (initialTripId && list.some(t => String(t.id) === initialTripId)) {
           els.tripSel.value = initialTripId;
-          await loadTripById(initialTripId);   // 直接載入那筆行程
+          await loadTripById(initialTripId);   // 載入舊資料
         } else {
           els.tripSel.value = 'new';
+          resetForm(); // ▼▼▼ 關鍵：沒有 ID 或找不到時，強制清空 ▼▼▼
         }
 
         updateButtonUI();
@@ -495,7 +540,14 @@
         state.name=t.name; state.region=t.region; state.budget=t.budget_twd; state.people=t.people; state.dailyHours=t.daily_hours;
         if(t.start_date){const [y,m,d]=t.start_date.split('-').map(Number); state.year=y; state.month=m; state.startDay=d; state.endDay=d+(t.days)-1;}
         state.prefs = t.preferences || { pace: '適中', types: [], transport: [], dining: [] };
-        
+        // ▼▼▼ 新增這段：把關鍵資料存起來做備份 (Deep Copy) ▼▼▼
+        loadedState = JSON.parse(JSON.stringify({
+            region: state.region,
+            start_date: t.start_date,
+            days: t.days,
+            prefs: state.prefs
+        }));
+        // ▲▲▲ 新增結束 ▲▲▲
         // 更新 UI
         renderChips(els.pace,paceOpts,true,'pace'); renderChips(els.types,typeOpts,false,'types');
         renderChips(els.transport,transportOpts,false,'transport'); renderChips(els.dining,diningOpts,false,'dining');
@@ -512,15 +564,11 @@
     }
 
     els.tripSel.addEventListener('change',()=>{
-        if(els.tripSel.value==='new'){
-            // 重置
-            localStorage.removeItem(storeKey); 
-            state = { name: '', region: '', budget: 0, people: 1, dailyHours: 8, year: new Date().getFullYear(), month: new Date().getMonth()+1, startDay: null, endDay: null, prefs: { pace: '適中', types: [], transport: [], dining: [] } };
-            saveState(); syncInputs(); buildCalendar();
-            renderChips(els.pace,paceOpts,true,'pace'); renderChips(els.types,typeOpts,false,'types');
-            renderChips(els.transport,transportOpts,false,'transport'); renderChips(els.dining,diningOpts,false,'dining');
-            updateButtonUI();
-        }else{
+        if(els.tripSel.value === 'new'){
+            // 手動選新建 -> 清空
+            resetForm(); 
+        } else {
+            // 選其他 -> 載入
             loadTripById(els.tripSel.value);
         }
     });
@@ -530,7 +578,6 @@
       const p = currentPayload();
       if(!p.name || !p.region || !p.start_date || p.days<=0){ alert('請填寫完整資訊與日期'); return; }
 
-      // 依據下拉選單的值來決定是 New 還是 Update
       const isUpdate = (els.tripSel.value !== 'new');
       
       els.btnSubmit.disabled = true;
@@ -538,27 +585,40 @@
 
       try {
         let finalId = null; 
+        
+        // ▼▼▼ 判斷關鍵變更 ▼▼▼
+        // 如果是新建模式，或是關鍵欄位有變，就需要「重置行程」
+        const needReset = !isUpdate || hasCriticalChanges(p);
 
         if(isUpdate){
           // === 更新模式 ===
-          // 直接使用選單上的 ID，不依賴後端回傳
           finalId = els.tripSel.value;
           
-          const resp = await fetch(`${API}/trips/${finalId}`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                id: Number(finalId), // 必傳
+          // 準備要送出的資料
+          const updateBody = {
+                id: Number(finalId),
                 name: p.name, region: p.region, start_date: p.start_date, days: p.days,
                 budget_twd: p.budget_twd, people: p.people, daily_hours: p.daily_hours,
                 preferences: p.preferences,
-                plan: [] // 清空 Plan 讓 Chat 重新規劃
-            })
+                // plan 欄位不放進這裡，下面動態決定
+            };
+
+          // ⚠️ 關鍵邏輯：
+          // 如果需要重置 (地點改了、日期改了...) -> 傳送 plan: [] 讓後端清空
+          // 如果不需要重置 (只改名字、預算...) -> 不傳 plan 欄位，後端(MongoDB)就不會動它
+          if (needReset) {
+              updateBody.plan = [];
+          }
+
+          const resp = await fetch(`${API}/trips/${finalId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(updateBody)
           });
           if(!resp.ok) throw new Error(await resp.text());
 
         } else {
-          // === 新建模式 ===
+          // === 新建模式 (一定全是新的) ===
           const resp = await fetch(`${API}/trips`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -570,32 +630,53 @@
           });
           if(!resp.ok) throw new Error(await resp.text());
           const newTrip = await resp.json();
-          finalId = newTrip.id; // 新建的必須拿後端 ID
+          finalId = newTrip.id; 
         }
 
-        // 清除該 ID 的舊對話 (強迫 Chat 頁面重來)
-        localStorage.removeItem(`chat_history_${finalId}`);
+        // ▼▼▼ 只有在「需要重置」時，才清除對話紀錄 ▼▼▼
+        if (needReset) {
+            localStorage.removeItem(`chat_history_${finalId}`);
+            console.log("關鍵資料變更，已重置對話與行程");
+        } else {
+            console.log("僅更新基本資料，保留對話與行程");
+        }
 
         // 跳轉
-        console.log("跳轉 ID:", finalId);
         window.location.href = `/web/chat.html?trip=${finalId}`;
 
       } catch(err) {
         console.error(err);
         alert('操作失敗：' + err.message);
         els.btnSubmit.disabled=false; 
-        updateButtonUI(); // 回復按鈕狀態
+        updateButtonUI(); 
       }
     });
-
+    
     if(els.btnDelete) els.btnDelete.addEventListener('click', async()=>{
-      if(!confirm('確定刪除？'))return;
-      await fetch(`${API}/trips/${els.tripSel.value}`,{method:'DELETE'});
-      loadTripList();
-      els.tripSel.value = 'new';
-      updateButtonUI();
-    });
+      if(!confirm('確定刪除？')) return;
+      
+      try {
+          await fetch(`${API}/trips/${els.tripSel.value}`,{method:'DELETE'});
+          
+          // 刪除成功後：
+          // 1. 清除網址參數 (避免重整後又想抓舊 ID)
+          const url = new URL(window.location);
+          url.searchParams.delete('trip');
+          url.searchParams.delete('tripId');
+          window.history.pushState({}, '', url);
 
+          // 2. 重新整理列表
+          await loadTripList(); // 這會觸發上面的 else 邏輯
+          
+          // 3. 強制切換到新建並清空 (雙重保險)
+          els.tripSel.value = 'new';
+          resetForm(); 
+
+      } catch(e) {
+          console.error(e);
+          alert("刪除失敗");
+      }
+    });
     // 1. 初始化下拉選單
     initYearMonth(); 
     
