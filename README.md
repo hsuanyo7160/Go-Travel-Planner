@@ -26,7 +26,12 @@ bash status.sh
 
 ## 注意事項
 
+必要：
 自己的 api key 開在 /backend/.env 下就可以用了
+GEMINI_API_KEY = 你的\_gemini_key
+
+非必要：
+UNSPLASH_ACCESS_KEY = 你的\_unsplash_access_key (用於顯示圖片)
 
 ## 快速開始
 
@@ -90,8 +95,7 @@ cd backend
 
 ## 開發建議
 
-1. 加入資料庫支援 (PostgreSQL/MySQL)
-2. 實作用戶認證系統
-3. 整合地圖服務 (Google Maps)
-4. 加入 AI 行程建議功能
-5. 匯出功能 (PDF/Excel)
+1. 實作用戶認證系統
+2. 整合地圖服務 (Google Maps)
+3. 加入 AI 行程建議功能
+4. 匯出功能 (PDF/Excel)
