@@ -28,6 +28,8 @@ func main() {
 		test_gemini()
 	case "tomtom":
 		test_tomtom()
+	case "unsplash":
+		test_unsplash()
 	default:
 		log.Fatalf("未知指令: %s\n", os.Args[1])
 	}
