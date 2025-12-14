@@ -120,7 +120,7 @@
       const API = '/api';
       // Toggle for testing: when true, frontend will use local images under /web/Source_img
       // instead of calling the Unsplash API. Set to false to use Unsplash via backend.
-      const USE_LOCAL_IMAGES = true;
+      const USE_LOCAL_IMAGES = false;
 
       const params = new URLSearchParams(location.search);
       const rawId = params.get('trip') || params.get('tripId');
