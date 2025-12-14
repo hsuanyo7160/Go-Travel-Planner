@@ -494,8 +494,10 @@
             const goDateParam = formatSkyscannerDate(startDateObj);
             const backDateParam = formatSkyscannerDate(returnDateObj);
 
+            const adultCount = tripData.people || 1;
+
             // 7. 開啟視窗
-            const url = `https://www.skyscanner.com.tw/transport/flights/${originCode}/${destCode}/${goDateParam}/${backDateParam}/?cabinclass=economy&adults=1`;
+            const url = `https://www.skyscanner.com.tw/transport/flights/${originCode}/${destCode}/${goDateParam}/${backDateParam}/?cabinclass=economy&adultsv2=${adultCount}`;
 
             createBubble('llm', `✈️ 正在為您開啟 Skyscanner 比價視窗：\n**${originCode} ↔ ${destName} (${destCode})**\n日期：${startDateStr} ~ ${returnDateObj.toISOString().split('T')[0]}`);
 
