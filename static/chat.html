@@ -404,46 +404,80 @@
       document.addEventListener('DOMContentLoaded', initChat);
 
       // ========== 機票按鈕 (全自動 Skyscanner 版) - 最終優化版 ==========
+      // ========== 機票按鈕 (全自動 Skyscanner 版) - 最終修正版 ==========
       const btnCheckFlight = document.getElementById('btnCheckFlight');
       
+      // 定義查詢函式 (拉到外面比較整齊)
+      async function getIATACode(locationName) {
+          // 1. 常用列表 (為了速度，先查這些，沒有才問 AI)
+          const common = {
+              "台北": "TPE", "桃園": "TPE", "高雄": "KHH",
+              "東京": "TYO", "大阪": "OSA", "京都": "OSA", // 京都無機場，通常飛大阪
+              "首爾": "SEL", "曼谷": "BKK", "香港": "HKG",
+              "新加坡": "SIN", "沖繩": "OKA", "北海道": "SPK"
+          };
+          if (common[locationName]) return common[locationName];
+
+          // 2. 問 Gemini
+          try {
+              const resp = await fetch('/api/iata', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ location: locationName })
+              });
+              
+              if (!resp.ok) return null;
+              
+              const data = await resp.json();
+              if (data.code === 'UNK' || !data.code || data.code.length !== 3) return null;
+              
+              console.log(`AI 查詢代碼: ${locationName} -> ${data.code}`);
+              return data.code;
+
+          } catch (e) {
+              console.error("IATA 查詢失敗:", e);
+              return null;
+          }
+      }
+
       if(btnCheckFlight){
-        btnCheckFlight.addEventListener('click', () => { // 這裡不用 async 了，因為沒 fetch
+        // 注意：這裡加上了 async
+        btnCheckFlight.addEventListener('click', async () => { 
             
-            // ▼▼▼ 直接檢查 Global 變數 ▼▼▼
+            // 1. 檢查資料
             if (!currentTripData) {
-                alert("行程資料尚未載入或讀取失敗，請重新整理頁面試試。");
+                alert("行程資料尚未載入，請稍後再試。");
                 return;
             }
+            const tripData = currentTripData;
             
-            const tripData = currentTripData; // 直接拿來用
-            
-            // --- 以下邏輯完全不用動 ---
-            const originCode = "TPE"; 
-
-            // 地名轉機場代碼對照
-            const cityToCode = {
-              "東京": "TYO", "大阪": "OSA", "京都": "OSA", "北海道": "SPK", "沖繩": "OKA", "福岡": "FUK",
-              "首爾": "SEL", "釜山": "PUS",
-              "曼谷": "BKK", "清邁": "CNX",
-              "新加坡": "SIN", "吉隆坡": "KUL",
-              "倫敦": "LON", "巴黎": "PAR", "紐約": "NYC", "洛杉磯": "LAX", "舊金山": "SFO",
-              "雪梨": "SYD", "墨爾本": "MEL",
-              "香港": "HKG", "澳門": "MFM"
-            };
-            
-            let destName = tripData.region || ""; 
-            let destCode = cityToCode[destName];
-
-            if (!destCode) {
-              destCode = prompt(`系統不確定「${destName}」的機場代碼。\n請輸入機場代碼 (例如 名古屋請輸入 NGO):`, "");
-              if (!destCode) return;
-            }
-
             if (!tripData.start_date) {
               alert("行程缺少出發日期");
               return;
             }
 
+            // 2. UI 變成載入中
+            const originalText = btnCheckFlight.innerHTML;
+            btnCheckFlight.innerText = "查詢代碼中...";
+            btnCheckFlight.disabled = true;
+
+            const originCode = "TPE"; 
+            let destName = tripData.region || ""; 
+            
+            // 3. 呼叫新函式取得代碼 (等待 AI 回應)
+            let destCode = await getIATACode(destName);
+
+            // 4. 恢復按鈕
+            btnCheckFlight.innerHTML = originalText;
+            btnCheckFlight.disabled = false;
+
+            // 5. 如果 AI 還是查不到 (或回傳 null)，改用手動輸入
+            if (!destCode) {
+              destCode = prompt(`系統不確定「${destName}」的機場代碼。\n(AI查詢失敗)\n\n請手動輸入機場代碼 (例如 名古屋請輸入 NGO):`, "");
+              if (!destCode) return;
+            }
+
+            // 6. 處理日期格式 (Skyscanner 格式 yymmdd)
             const startDateStr = tripData.start_date; 
             const startDateObj = new Date(startDateStr);
             const days = parseInt(tripData.days) || 5; 
@@ -460,9 +494,10 @@
             const goDateParam = formatSkyscannerDate(startDateObj);
             const backDateParam = formatSkyscannerDate(returnDateObj);
 
+            // 7. 開啟視窗
             const url = `https://www.skyscanner.com.tw/transport/flights/${originCode}/${destCode}/${goDateParam}/${backDateParam}/?cabinclass=economy&adults=1`;
 
-            createBubble('llm', `✈️ 正在為您開啟 Skyscanner 比價視窗：\n**${originCode} ↔ ${destName}(${destCode})**\n日期：${startDateStr} ~ ${returnDateObj.toISOString().split('T')[0]}`);
+            createBubble('llm', `✈️ 正在為您開啟 Skyscanner 比價視窗：\n**${originCode} ↔ ${destName} (${destCode})**\n日期：${startDateStr} ~ ${returnDateObj.toISOString().split('T')[0]}`);
 
             window.open(url, '_blank');
         });
