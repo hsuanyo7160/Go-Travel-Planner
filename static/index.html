@@ -696,31 +696,40 @@
       }
     });
     
-    if(els.btnDelete) els.btnDelete.addEventListener('click', async()=>{
-      if(!confirm('確定刪除？')) return;
-      
-      try {
-          await fetch(`${API}/trips/${els.tripSel.value}`,{method:'DELETE'});
-          
-          // 刪除成功後：
-          // 1. 清除網址參數 (避免重整後又想抓舊 ID)
+    if (els.btnDelete) {
+      els.btnDelete.addEventListener('click', async () => {
+        if (!confirm('確定刪除這個行程嗎？')) return;
+
+        try {
+          await fetch(`${API}/trips/${els.tripSel.value}`, {
+            method: 'DELETE'
+          });
+
+          // 清除網址參數
           const url = new URL(window.location);
           url.searchParams.delete('trip');
           url.searchParams.delete('tripId');
           window.history.pushState({}, '', url);
 
-          // 2. 重新整理列表
-          await loadTripList(); // 這會觸發上面的 else 邏輯
-          
-          // 3. 強制切換到新建並清空 (雙重保險)
+          // 重新載入清單 + 清空表單
+          await loadTripList();
           els.tripSel.value = 'new';
-          resetForm(); 
+          resetForm();
 
-      } catch(e) {
+          //  顯示刪除成功 Toast
+          const toastEl = document.getElementById('deleteToast');
+          if (toastEl) {
+            const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+            toast.show();
+          }
+
+        } catch (e) {
           console.error(e);
-          alert("刪除失敗");
-      }
-    });
+          alert('刪除失敗，請稍後再試');
+        }
+      });
+    }
+
     // 1. 初始化下拉選單
     initYearMonth(); 
     
@@ -783,5 +792,24 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- 刪除成功 Toast -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="deleteToast"
+        class="toast align-items-center text-bg-success border-0"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+           行程已成功刪除
+        </div>
+        <button type="button"
+                class="btn-close btn-close-white me-2 m-auto"
+                data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
