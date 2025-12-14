@@ -65,6 +65,20 @@
       /* ensure headings inside bubbles keep prominence */
       .bubble .session-day{ font-size:1.5rem !important; font-weight:800 !important; color:#030303 !important; }
       .session-day + br {display: none;}
+      /* Ensure chat container layout defaults */
+      .chat-container{ width:100%; max-width:none; margin:0; padding:0; border-radius:0; }
+      /* Compare button placed inside input row: keep compact */
+      #btnCheckFlight{
+        border-radius:10px;
+        padding:0.8rem 0.75rem;
+        box-shadow:0 6px 18px rgba(2,6,23,0.08);
+        flex:0 0 auto;
+      }
+      /* Make the chat input expand to fill remaining width */
+      .chat-input-bar .form-control{ flex:1 1 auto; }
+      @media (max-width:576px){
+        #btnCheckFlight{ padding:0.4rem 0.55rem; }
+      }
     </style>
   </head>
   <body>
@@ -73,15 +87,13 @@
         <a class="navbar-brand" href="/web/">旅遊助手</a>
         <div class="ms-auto d-flex gap-2 align-items-center">
           <button id="backBtn" class="btn btn-outline-secondary btn-sm">回列表</button>
-          <button id="btnCheckFlight" class="btn btn-primary btn-sm d-flex align-items-center gap-1">
-            <span>✈️</span> 比價
-          </button>
         </div>
       </div>
     </nav>
 
     <main class="container-fluid">
       <div class="chat-container shadow-sm rounded-3 p-3">
+        <!-- compare button will live in the input row -->
         <div class="row g-0">
 
           <div class="col-12 chat-area">
@@ -92,7 +104,10 @@
           <!-- right column removed: user messages will appear inside the main llmPane as right-aligned bubbles -->
         </div>
 
-        <div class="chat-input-bar mt-3 d-flex gap-2">
+        <div class="chat-input-bar mt-3 d-flex gap-2 align-items-center">
+          <button id="btnCheckFlight" class="btn btn-primary btn-sm d-flex align-items-center gap-1">
+            <span>✈️</span> 比價
+          </button>
           <input id="chatInput" class="form-control" placeholder="輸入你的問題或指示（例如：幫我調整行程）" />
           <button id="sendBtn" class="btn btn-primary">💬</button>
         </div>
@@ -105,7 +120,7 @@
       const API = '/api';
       // Toggle for testing: when true, frontend will use local images under /web/Source_img
       // instead of calling the Unsplash API. Set to false to use Unsplash via backend.
-      const USE_LOCAL_IMAGES = false;
+      const USE_LOCAL_IMAGES = true;
 
       const params = new URLSearchParams(location.search);
       const rawId = params.get('trip') || params.get('tripId');
