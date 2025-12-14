@@ -389,7 +389,7 @@
             // 有資料，直接開始規劃
             const tripData = currentTripData;
             displayText(bubble, `嗨！我看到您想去 **${tripData.region}** 玩 ${tripData.days} 天。\n我正在根據您的偏好（${tripData.preferences?.pace || '適中'}、${tripData.preferences?.types?.join('/') || '無'}）為您規劃...`);
-            const prompt = `SYSTEM_prompt: 請扮演專業導遊。\n  這是使用者的行程需求 JSON：${JSON.stringify(tripData)}\n  請根據此資訊，規劃一份詳細的${tripData.days}天行程。\n  請用繁體中文，條列式呈現，包含每天的景點、餐飲建議，景點欄位要是英文名\n  請直接開始規劃，不用解釋.`;
+            const prompt = `SYSTEM_prompt: 請扮演專業導遊。\n  這是使用者的行程需求 JSON：${JSON.stringify(tripData)}\n  請根據此資訊，規劃一份詳細的${tripData.days}天行程。\n  請用繁體中文，條列式呈現，包含每天的景點、餐飲建議。景點欄位要是英文名且要包含交通、詳細的景點介紹(200字以上)，時間要用粗體標示(ex: **下午(...)** or **午餐(...)**)，\n  請直接開始規劃，不用解釋.`;
             await sendMessage(prompt, true);
         } else {
             // 萬一 initChat 抓失敗了，這裡顯示錯誤
