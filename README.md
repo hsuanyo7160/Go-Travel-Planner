@@ -6,14 +6,25 @@
 
 ```
 Go-Travel-Planner/
-├── backend/        # 後端 API + 前端服務
-│   ├── main.go    # 主程式
-│   └── go.mod     # Go 模組設定
-├── static/        # 前端靜態檔案
-│   ├── index.html # 主頁面
-│   ├── chat.html  # 聊天介面
-│   └── style.css  # 樣式檔
-└── start.sh       # 啟動腳本
+├── main.go                # 專案啟動器（Launcher：從根目錄啟動 backend）
+├── backend/               # 後端服務（Gin + MongoDB + Gemini）
+│   ├── main.go            # 後端主程式（Router / Server entrypoint）
+│   ├── go.mod             # backend 模組設定
+│   ├── .env               # (自行建立) API Key 等環境變數
+│   ├── models.go
+│   ├── mongo.go
+│   ├── handlers_trips.go
+│   ├── handlers_gemini.go
+│   ├── handlers_unsplash.go
+│   ├── handlers_iata.go
+│   └── utils.go
+├── static/                # 前端靜態檔案（由 backend 以 /web 提供）
+│   ├── index.html
+│   ├── chat.html
+│   └── style.css
+├── start.sh               # 啟動腳本（可選）
+└── status.sh              # 狀態檢查（可選）
+
 ```
 
 ## 狀況檢查
@@ -45,7 +56,7 @@ go run main.go
 
 ```bash
 cd backend
-go run main.go
+go run .
 ```
 
 ### 方法三：使用提供的 Go 版本
@@ -92,10 +103,3 @@ cd backend
 
 - Go 1.21 或以上版本
 - 瀏覽器支援 HTML5
-
-## 開發建議
-
-1. 實作用戶認證系統
-2. 整合地圖服務 (Google Maps)
-3. 加入 AI 行程建議功能
-4. 匯出功能 (PDF/Excel)
