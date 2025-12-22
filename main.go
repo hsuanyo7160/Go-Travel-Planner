@@ -14,7 +14,7 @@ func main() {
 	fmt.Println("================================")
 
 	// 切換到 backend 目錄並執行
-	cmd := exec.Command("go", "run", "main.go")
+	cmd := exec.Command("go", "run", ".")
 	cmd.Dir = "./backend"
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
